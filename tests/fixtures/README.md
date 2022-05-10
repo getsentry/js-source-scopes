@@ -1,0 +1,1 @@
+- https://unpkg.com/typescript@4.6.4/lib/typescript.js
