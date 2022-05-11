@@ -33,7 +33,7 @@ pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
 }
 
 /// A line/column source position.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct SourcePosition {
     /// Line in the source file, 0-based.
     line: u32,
@@ -67,7 +67,6 @@ impl<T: AsRef<str>> SourceContext<T> {
         let buf_ptr = buf.as_ptr();
         let mut line_offsets: Vec<u32> = buf
             .lines()
-            .skip(1)
             .map(|line| unsafe { line.as_ptr().offset_from(buf_ptr) as usize }.try_into())
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| SourceContextError(()))?;
@@ -77,12 +76,8 @@ impl<T: AsRef<str>> SourceContext<T> {
 
     /// Get the `nth` line of the source, 0-based.
     pub fn get_line(&self, nth: u32) -> Option<&str> {
-        let from = if nth == 0 {
-            0
-        } else {
-            self.line_offsets.get((nth - 1) as usize).copied()? as usize
-        };
-        let to = self.line_offsets.get(nth as usize).copied()? as usize;
+        let from = self.line_offsets.get(nth as usize).copied()? as usize;
+        let to = self.line_offsets.get(nth as usize + 1).copied()? as usize;
         self.src.as_ref().get(from..to)
     }
 
@@ -90,13 +85,24 @@ impl<T: AsRef<str>> SourceContext<T> {
     ///
     /// The column is given in UTF-16 code points.
     pub fn offset_to_position(&self, offset: u32) -> Option<SourcePosition> {
+        // `into_ok_or_err` is still nightly-only
+        // TODO: fix this stuff, its so confusing, lol
         let line_no = match self.line_offsets.binary_search(&offset) {
             Ok(line) => line,
             Err(line) => line,
+        };
+        if line_no >= self.line_offsets.len() - 1 {
+            return None;
         }
-        .try_into()
-        .ok()?;
-        let mut byte_offset = self.line_offsets.get(line_no as usize).copied()? as usize;
+
+        let mut byte_offset = self.line_offsets.get(line_no).copied()? as usize;
+
+        let line_no = line_no.try_into().ok()?;
+
+        if byte_offset == offset as usize {
+            return Some(SourcePosition::new(line_no, 0));
+        }
+
         let line = self.get_line(line_no)?;
 
         let mut utf16_offset = 0;
@@ -116,16 +122,17 @@ impl<T: AsRef<str>> SourceContext<T> {
     pub fn position_to_offset(&self, position: SourcePosition) -> Option<u32> {
         let SourcePosition { line, column } = position;
 
-        let from = if line == 0 {
-            0
-        } else {
-            self.line_offsets.get((line - 1) as usize).copied()? as usize
-        };
-        let to = self.line_offsets.get(line as usize).copied()? as usize;
+        let from = self.line_offsets.get(line as usize).copied()?;
+        let to = self.line_offsets.get(line as usize + 1).copied()? as usize;
+
+        if column == 0 {
+            return Some(from);
+        }
+        let from = from as usize;
 
         let line = self.src.as_ref().get(from..to)?;
 
-        let mut byte_offset = to;
+        let mut byte_offset = from;
         let mut utf16_offset = 0;
         let column = column as usize;
         for c in line.chars() {
@@ -263,7 +270,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn source_context() {}
+    fn source_context() {
+        let ctx = SourceContext::new("").unwrap();
+        assert_eq!(ctx.get_line(0), None);
+        assert_eq!(ctx.offset_to_position(0), None);
+        assert_eq!(ctx.position_to_offset(SourcePosition::new(0, 0)), None);
+
+        let src = "\n \r\na";
+        let ctx = SourceContext::new(src).unwrap();
+        assert_eq!(ctx.get_line(0), Some("\n"));
+        assert_eq!(ctx.get_line(1), Some(" \r\n"));
+        assert_eq!(ctx.get_line(2), Some("a"));
+        //assert_eq!(ctx.offset_to_position(1), Some(SourcePosition::new(1, 0)));
+        //assert_eq!(ctx.offset_to_position(2), Some(SourcePosition::new(1, 1)));
+
+        for offset in 0..=src.len() {
+            println!(
+                "offset {} in {:?} ({:?}) has position {:?}",
+                offset,
+                src,
+                src.get(offset..offset + 1),
+                ctx.offset_to_position(offset as u32)
+            );
+        }
+
+        let offset = ctx.position_to_offset(SourcePosition::new(2, 0)).unwrap();
+        assert_eq!(offset, 4);
+        assert_eq!(&src[offset as usize..], "a");
+    }
 
     #[test]
     fn resolved_correct_scopes() {
