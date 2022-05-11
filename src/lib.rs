@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn parses() {
-        let src = std::fs::read_to_string("tests/fixtures/simple.js").unwrap();
+        let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
         parse_with_rslint(&src);
     }
