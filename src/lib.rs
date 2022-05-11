@@ -1,16 +1,55 @@
-pub use rslint::parse_with_rslint;
-//pub use swc::parse_with_swc;
+use std::ops::Range;
+
+/// Extracts function scopes from the given JS-like `src`.
+///
+/// The returned Vec includes the `Range` of the function scope, in byte offsets
+/// inside the `src`, and the corresponding function name. `None` in this case
+/// denotes a function scope for which no name could be inferred from the
+/// surrounding code, which can mostly happen for anonymous or arrow functions
+/// used as immediate callbacks.
+///
+/// The range includes the whole range of the function expression, including the
+/// leading `function` keyword, function argument parentheses and trailing brace
+/// in case there is one.
+/// The returned vector does not have a guaranteed sorting order, and is
+/// implementation dependent.
+///
+/// # Examples
+///
+/// ```
+/// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
+/// //                arrowFnExpr -^------^  ^------namedFnDecl------^
+/// let mut scopes = js_source_scopes::extract_scope_names(src);
+/// scopes.sort_by_key(|s| s.0.start);
+///
+/// let expected = vec![
+///   (20..28, Some(String::from("arrowFnExpr"))),
+///   (30..55, Some(String::from("namedFnDecl"))),
+/// ];
+/// assert_eq!(scopes, expected);
+/// ```
+pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
+    rslint::parse_with_rslint(src)
+}
 
 mod rslint {
-    use rslint_parser::{ast, AstNode, SyntaxKind, SyntaxNode, SyntaxNodeExt};
+    use std::ops::Range;
 
-    pub fn parse_with_rslint(src: &str) {
+    use rslint_parser::{ast, AstNode, SyntaxKind, SyntaxNode, SyntaxNodeExt, TextRange};
+
+    fn convert_text_range(range: TextRange) -> Range<u32> {
+        range.start().into()..range.end().into()
+    }
+
+    pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<String>)> {
         let parse =
             //rslint_parser::parse_with_syntax(src, 0, rslint_parser::FileKind::TypeScript.into());
             rslint_parser::parse_text(src, 0);
 
         let syntax = parse.syntax();
-        dbg!(&syntax);
+        //dbg!(&syntax);
+
+        let mut ranges = vec![];
 
         for node in syntax.descendants() {
             if let Some(fn_decl) = node.try_to::<ast::FnDecl>() {
@@ -18,16 +57,19 @@ mod rslint {
                     .name()
                     .map(|n| n.text())
                     .or_else(|| find_fn_name_from_ctx(&node));
-                println!("{:?}: {:?}", name, node.text_range());
+
+                ranges.push((convert_text_range(node.text_range()), name));
             } else if let Some(fn_expr) = node.try_to::<ast::FnExpr>() {
                 let name = fn_expr
                     .name()
                     .map(|n| n.text())
                     .or_else(|| find_fn_name_from_ctx(&node));
-                println!("{:?}: {:?}", name, node.text_range());
+
+                ranges.push((convert_text_range(node.text_range()), name));
             } else if node.is::<ast::ArrowExpr>() {
                 let name = find_fn_name_from_ctx(&node);
-                println!("{:?}: {:?}", name, node.text_range());
+
+                ranges.push((convert_text_range(node.text_range()), name));
             }
 
             // TODO: method, constructor
@@ -38,6 +80,8 @@ mod rslint {
                 _ => todo!(),
             }*/
         }
+
+        ranges
     }
 
     fn find_fn_name_from_ctx(node: &SyntaxNode) -> Option<String> {
@@ -113,6 +157,6 @@ mod tests {
     fn parses() {
         let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
-        parse_with_rslint(&src);
+        extract_scope_names(&src);
     }
 }
