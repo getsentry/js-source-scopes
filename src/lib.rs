@@ -32,6 +32,109 @@ pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
     rslint::parse_with_rslint(src)
 }
 
+/// A line/column source position.
+pub struct SourcePosition {
+    /// Line in the source file, 0-based.
+    line: u32,
+    /// Column in the source file, 0-based.
+    ///
+    /// The column is given in UTF-16 code points.
+    column: u32,
+}
+
+/// A Source Context allowing fast access to lines and line/column <-> byte offset remapping.
+pub struct SourceContext<T> {
+    src: T,
+    line_offsets: Vec<u32>,
+}
+
+/// An Error that can happen when building a [`SourceContext`].
+pub struct SourceContextError(());
+
+impl<T: AsRef<str>> SourceContext<T> {
+    /// Construct a new Source Context from the given `src` buffer.
+    pub fn new(src: T) -> Result<Self, SourceContextError> {
+        let buf = src.as_ref();
+        let buf_ptr = buf.as_ptr();
+        let mut line_offsets: Vec<u32> = buf
+            .lines()
+            .skip(1)
+            .map(|line| unsafe { line.as_ptr().offset_from(buf_ptr) as usize }.try_into())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| SourceContextError(()))?;
+        line_offsets.push(buf.len().try_into().map_err(|_| SourceContextError(()))?);
+        Ok(Self { src, line_offsets })
+    }
+
+    /// Get the `nth` line of the source, 0-based.
+    pub fn get_line(&self, nth: u32) -> Option<&str> {
+        let from = if nth == 0 {
+            0
+        } else {
+            self.line_offsets.get((nth - 1) as usize).copied()? as usize
+        };
+        let to = self.line_offsets.get(nth as usize).copied()? as usize;
+        self.src.as_ref().get(from..to)
+    }
+
+    /// Converts a byte offset into the source to the corresponding line/column.
+    ///
+    /// The column is given in UTF-16 code points.
+    pub fn offset_to_position(&self, offset: u32) -> Option<SourcePosition> {
+        let line_no = match self.line_offsets.binary_search(&offset) {
+            Ok(line) => line,
+            Err(line) => line,
+        }
+        .try_into()
+        .ok()?;
+        let mut byte_offset = self.line_offsets.get(line_no as usize).copied()? as usize;
+        let line = self.get_line(line_no)?;
+
+        let mut utf16_offset = 0;
+        for c in line.chars() {
+            utf16_offset += c.len_utf16();
+            byte_offset += c.len_utf8();
+
+            if byte_offset >= offset as usize {
+                return Some(SourcePosition {
+                    line: line_no,
+                    column: utf16_offset.try_into().ok()?,
+                });
+            }
+        }
+
+        None
+    }
+
+    /// Converts the given line/column to the corresponding byte offset inside the source.
+    pub fn position_to_offset(&self, position: SourcePosition) -> Option<u32> {
+        let SourcePosition { line, column } = position;
+
+        let from = if line == 0 {
+            0
+        } else {
+            self.line_offsets.get((line - 1) as usize).copied()? as usize
+        };
+        let to = self.line_offsets.get(line as usize).copied()? as usize;
+
+        let line = self.src.as_ref().get(from..to)?;
+
+        let mut byte_offset = to;
+        let mut utf16_offset = 0;
+        let column = column as usize;
+        for c in line.chars() {
+            utf16_offset += c.len_utf16();
+            byte_offset += c.len_utf8();
+
+            if utf16_offset >= column {
+                return byte_offset.try_into().ok();
+            }
+        }
+
+        None
+    }
+}
+
 mod rslint {
     use std::ops::Range;
 
@@ -157,6 +260,7 @@ mod tests {
     fn parses() {
         let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
-        extract_scope_names(&src);
+        let scopes = extract_scope_names(&src);
+        dbg!(scopes);
     }
 }
