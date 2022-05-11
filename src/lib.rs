@@ -33,6 +33,7 @@ pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
 }
 
 /// A line/column source position.
+#[derive(Debug)]
 pub struct SourcePosition {
     /// Line in the source file, 0-based.
     line: u32,
@@ -42,6 +43,13 @@ pub struct SourcePosition {
     column: u32,
 }
 
+impl SourcePosition {
+    /// Create a new SourcePosition with the given line/column.
+    pub fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+}
+
 /// A Source Context allowing fast access to lines and line/column <-> byte offset remapping.
 pub struct SourceContext<T> {
     src: T,
@@ -49,6 +57,7 @@ pub struct SourceContext<T> {
 }
 
 /// An Error that can happen when building a [`SourceContext`].
+#[derive(Debug)]
 pub struct SourceContextError(());
 
 impl<T: AsRef<str>> SourceContext<T> {
@@ -96,10 +105,7 @@ impl<T: AsRef<str>> SourceContext<T> {
             byte_offset += c.len_utf8();
 
             if byte_offset >= offset as usize {
-                return Some(SourcePosition {
-                    line: line_no,
-                    column: utf16_offset.try_into().ok()?,
-                });
+                return Some(SourcePosition::new(line_no, utf16_offset.try_into().ok()?));
             }
         }
 
@@ -257,10 +263,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses() {
+    fn source_context() {}
+
+    #[test]
+    fn resolved_correct_scopes() {
         let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
         let scopes = extract_scope_names(&src);
         dbg!(scopes);
+
+        let ctx = SourceContext::new(&src).unwrap();
+
+        // node gives the following stacktrace for the above file:
+        // at Object.objectLiteralAnon (.../sync.mjs:84:11)
+        // at Object.objectLiteralMethod (.../sync.mjs:81:9)
+        // at localReassign (.../sync.mjs:76:7)
+        // at Klass.prototypeMethod (.../sync.mjs:71:28)
+        // at Klass.#privateMethod (.../sync.mjs:40:10)
+        // at Klass.classCallbackArrow (.../sync.mjs:36:24)
+        // at .../sync.mjs:65:34
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at Klass.classCallbackBound (.../sync.mjs:65:5)
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at Klass.classCallbackSelf (.../sync.mjs:61:5)
+        // at .../sync.mjs:56:12
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at Klass.classMethod (.../sync.mjs:55:5)
+        // at new BaseKlass (.../sync.mjs:32:10)
+        // at new Klass (.../sync.mjs:50:5)
+        // at Function.staticMethod (.../sync.mjs:46:5)
+        // at .../sync.mjs:22:17
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at .../sync.mjs:21:9
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at namedImmediateCallback (.../sync.mjs:19:7)
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at namedDeclaredCallback (.../sync.mjs:17:5)
+        // at callsSyncCallback (.../shared.mjs:2:3)
+        // at arrowFn (.../sync.mjs:27:3)
+        // at anonFn (.../sync.mjs:12:3)
+        // at namedFnExpr (.../sync.mjs:8:3)
+        // at namedFn (.../sync.mjs:4:3)
+
+        // NOTE: all the source positions in the stack trace are 1-based
+        // `localReassign`:
+        dbg!(ctx.position_to_offset(SourcePosition::new(75, 6)));
+        // `namedImmediateCallback`:
+        dbg!(ctx.position_to_offset(SourcePosition::new(18, 6)));
+        // `namedDeclaredCallback`:
+        dbg!(ctx.position_to_offset(SourcePosition::new(16, 4)));
+        // `arrowFn`:
+        dbg!(ctx.position_to_offset(SourcePosition::new(26, 2)));
     }
 }
