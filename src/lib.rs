@@ -1,3 +1,5 @@
+// TODO: should we rather have `usize` everywhere instead of `u32`?
+
 use std::ops::Range;
 
 mod lookup;

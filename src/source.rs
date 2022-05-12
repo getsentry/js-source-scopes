@@ -1,37 +1,29 @@
-/// A line/column source position.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct SourcePosition {
-    /// Line in the source file, 0-based.
-    line: u32,
-    /// Column in the source file, 0-based.
-    ///
-    /// The column is given in UTF-16 code points.
-    column: u32,
-}
-
-impl SourcePosition {
-    /// Create a new SourcePosition with the given line/column.
-    pub fn new(line: u32, column: u32) -> Self {
-        Self { line, column }
-    }
-}
-
 /// A Source Context allowing fast access to lines and line/column <-> byte offset remapping.
+///
+/// The primary use-case is to allow efficient conversion between
+/// [`SourcePosition`]s (line/column) to byte offsets. The [`SourcePosition`]s
+/// are 0-based. All offsets are treated as `u32`, and creating a
+/// [`SourceContext`] for a source that exceeds the range of a `u32` will result
+/// in an `Err`.
+///
+/// # Examples
+///
+/// ```
+/// use js_source_scopes::{SourceContext, SourcePosition};
+///
+/// let src = r#"const arrowFnExpr = (a) => a;
+/// function namedFnDecl() {}"#;
+///
+/// let ctx = SourceContext::new(src).unwrap();
+///
+/// let offset = ctx.position_to_offset(SourcePosition::new(0, 6)).unwrap() as usize;
+/// assert_eq!(&src[offset..offset+11], "arrowFnExpr");
+/// let offset = ctx.position_to_offset(SourcePosition::new(1, 9)).unwrap() as usize;
+/// assert_eq!(&src[offset..offset+11], "namedFnDecl");
+/// ```
 pub struct SourceContext<T> {
     src: T,
     line_offsets: Vec<u32>,
-}
-
-/// An Error that can happen when building a [`SourceContext`].
-#[derive(Debug)]
-pub struct SourceContextError(());
-
-impl std::error::Error for SourceContextError {}
-
-impl std::fmt::Display for SourceContextError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("source could not be converted to source context")
-    }
 }
 
 impl<T: AsRef<str>> SourceContext<T> {
@@ -43,13 +35,16 @@ impl<T: AsRef<str>> SourceContext<T> {
     /// Construct a new Source Context from the given `src` buffer.
     pub fn new(src: T) -> Result<Self, SourceContextError> {
         let buf = src.as_ref();
+        // we can do the bounds check once in the beginning, that guarantees that
+        // all the other offsets are within `u32` bounds.
+        let len = buf.len().try_into().map_err(|_| SourceContextError(()))?;
+
         let buf_ptr = buf.as_ptr();
         let mut line_offsets: Vec<u32> = buf
             .lines()
-            .map(|line| unsafe { line.as_ptr().offset_from(buf_ptr) as usize }.try_into())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| SourceContextError(()))?;
-        line_offsets.push(buf.len().try_into().map_err(|_| SourceContextError(()))?);
+            .map(|line| unsafe { line.as_ptr().offset_from(buf_ptr) as usize } as u32)
+            .collect();
+        line_offsets.push(len);
         Ok(Self { src, line_offsets })
     }
 
@@ -110,6 +105,36 @@ impl<T: AsRef<str>> SourceContext<T> {
         }
 
         None
+    }
+}
+
+/// A line/column source position.
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub struct SourcePosition {
+    /// Line in the source file, 0-based.
+    line: u32,
+    /// Column in the source file, 0-based.
+    ///
+    /// The column is given in UTF-16 code points.
+    column: u32,
+}
+
+impl SourcePosition {
+    /// Create a new SourcePosition with the given line/column.
+    pub fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+}
+
+/// An Error that can happen when building a [`SourceContext`].
+#[derive(Debug)]
+pub struct SourceContextError(());
+
+impl std::error::Error for SourceContextError {}
+
+impl std::fmt::Display for SourceContextError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("source could not be converted to source context")
     }
 }
 
