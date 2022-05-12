@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-swc_ecma_parser = "0.103.0"
+#swc_ecma_parser = "0.103.0"
 rslint_parser = "0.3.1"
+indexmap = "1.7.0"
