@@ -26,7 +26,20 @@ pub struct SourceContext<T> {
 #[derive(Debug)]
 pub struct SourceContextError(());
 
+impl std::error::Error for SourceContextError {}
+
+impl std::fmt::Display for SourceContextError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("source could not be converted to source context")
+    }
+}
+
 impl<T: AsRef<str>> SourceContext<T> {
+    /// Unwrap this Source Context into the inner source buffer.
+    pub fn into_inner(self) -> T {
+        self.src
+    }
+
     /// Construct a new Source Context from the given `src` buffer.
     pub fn new(src: T) -> Result<Self, SourceContextError> {
         let buf = src.as_ref();
