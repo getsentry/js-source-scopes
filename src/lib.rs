@@ -41,6 +41,7 @@ pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
     rslint::parse_with_rslint(src)
 }
 
+// TODO: maybe see if swc makes scope extraction easier / faster ?
 /*mod swc {
     use swc_ecma_parser::lexer::Lexer;
     use swc_ecma_parser::{Parser, StringInput, TsConfig};
@@ -64,59 +65,3 @@ pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
         let module = parser.parse_module().unwrap();
     }
 }*/
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolved_correct_scopes() {
-        let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
-
-        let scopes = extract_scope_names(&src);
-        dbg!(scopes);
-
-        let ctx = SourceContext::new(&src).unwrap();
-
-        // node gives the following stacktrace for the above file:
-        // at Object.objectLiteralAnon (.../sync.mjs:84:11)
-        // at Object.objectLiteralMethod (.../sync.mjs:81:9)
-        // at localReassign (.../sync.mjs:76:7)
-        // at Klass.prototypeMethod (.../sync.mjs:71:28)
-        // at Klass.#privateMethod (.../sync.mjs:40:10)
-        // at Klass.classCallbackArrow (.../sync.mjs:36:24)
-        // at .../sync.mjs:65:34
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at Klass.classCallbackBound (.../sync.mjs:65:5)
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at Klass.classCallbackSelf (.../sync.mjs:61:5)
-        // at .../sync.mjs:56:12
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at Klass.classMethod (.../sync.mjs:55:5)
-        // at new BaseKlass (.../sync.mjs:32:10)
-        // at new Klass (.../sync.mjs:50:5)
-        // at Function.staticMethod (.../sync.mjs:46:5)
-        // at .../sync.mjs:22:17
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at .../sync.mjs:21:9
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at namedImmediateCallback (.../sync.mjs:19:7)
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at namedDeclaredCallback (.../sync.mjs:17:5)
-        // at callsSyncCallback (.../shared.mjs:2:3)
-        // at arrowFn (.../sync.mjs:27:3)
-        // at anonFn (.../sync.mjs:12:3)
-        // at namedFnExpr (.../sync.mjs:8:3)
-        // at namedFn (.../sync.mjs:4:3)
-
-        // NOTE: all the source positions in the stack trace are 1-based
-        // `localReassign`:
-        dbg!(ctx.position_to_offset(SourcePosition::new(75, 6)));
-        // `namedImmediateCallback`:
-        dbg!(ctx.position_to_offset(SourcePosition::new(18, 6)));
-        // `namedDeclaredCallback`:
-        dbg!(ctx.position_to_offset(SourcePosition::new(16, 4)));
-        // `arrowFn`:
-        dbg!(ctx.position_to_offset(SourcePosition::new(26, 2)));
-    }
-}

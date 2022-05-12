@@ -42,7 +42,7 @@ impl ScopeIndex {
 
         scopes.sort_by_key(|s| s.0.start);
 
-        let needs_zero = scopes.first().map(|s| s.0.start == 0).unwrap_or(false);
+        let needs_zero = scopes.first().map(|s| s.0.start != 0).unwrap_or(false);
         if needs_zero {
             ranges.push((0, GLOBAL_SCOPE_SENTINEL));
         }
