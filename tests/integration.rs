@@ -1,28 +1,131 @@
-use js_source_scopes::{extract_scope_names, ScopeIndex, SourceContext, SourcePosition};
+use js_source_scopes::{
+    extract_scope_names, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
+};
 
 #[test]
 fn resolves_fn_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
     let scopes = extract_scope_names(&src);
-    dbg!(&scopes);
     let index = ScopeIndex::new(scopes).unwrap();
 
     let ctx = SourceContext::new(&src).unwrap();
 
-    // NOTE: the browsers use 1-based line/column numbers, while the crates uses
-    // 0-based numbers everywhere
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(83, 10)).unwrap()));
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(80, 8)).unwrap()));
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(75, 6)).unwrap()));
+    use ScopeLookupResult::*;
+    let lookup = |l: u32, c: u32| {
+        // NOTE: the browsers use 1-based line/column numbers, while the crates uses
+        // 0-based numbers everywhere
+        let offset = ctx
+            .position_to_offset(SourcePosition::new(l - 1, c - 1))
+            .unwrap();
+        index.lookup(offset)
+    };
 
-    // chrome/firefox disagree on this source stack trace location:
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(26, 19)).unwrap()));
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(26, 2)).unwrap()));
+    // objectLiteralAnon@http://127.0.0.1:8080/sync.mjs:84:11
+    // at Object.objectLiteralAnon (http://127.0.0.1:8080/sync.mjs:84:11)
+    // TODO:
+    // assert_eq!(lookup(84, 11), NamedScope(""));
 
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(11, 2)).unwrap()));
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(7, 2)).unwrap()));
-    dbg!(index.lookup(ctx.position_to_offset(SourcePosition::new(3, 2)).unwrap()));
+    // objectLiteralMethod@http://127.0.0.1:8080/sync.mjs:81:9
+    // at Object.objectLiteralMethod (http://127.0.0.1:8080/sync.mjs:81:9)
+    // TODO:
+    // assert_eq!(lookup(81, 9), NamedScope(""));
+
+    // localReassign@http://127.0.0.1:8080/sync.mjs:76:7
+    // at localReassign (http://127.0.0.1:8080/sync.mjs:76:7)
+    assert_eq!(lookup(76, 7), NamedScope("localReassign"));
+
+    // Klass.prototype.prototypeMethod@http://127.0.0.1:8080/sync.mjs:71:28
+    // at Klass.prototypeMethod (http://127.0.0.1:8080/sync.mjs:71:28)
+    assert_eq!(
+        lookup(71, 28),
+        NamedScope("Klass.prototype.prototypeMethod")
+    );
+
+    // #privateMethod@http://127.0.0.1:8080/sync.mjs:40:10
+    // at Klass.#privateMethod (http://127.0.0.1:8080/sync.mjs:40:10)
+    // TODO:
+    // assert_eq!(lookup(40, 10), NamedScope("BaseKlass.#privateMethod"));
+
+    // classCallbackArrow@http://127.0.0.1:8080/sync.mjs:36:24
+    // at Klass.classCallbackArrow (http://127.0.0.1:8080/sync.mjs:36:24)
+    // TODO:
+    // assert_eq!(lookup(36, 24), NamedScope("Klass.classCallbackArrow"));
+
+    // classCallbackBound/<@http://127.0.0.1:8080/sync.mjs:65:34
+    // at http://127.0.0.1:8080/sync.mjs:65:34
+    // TODO: should we infer a better name here?
+    assert_eq!(lookup(65, 34), AnonymousScope);
+    assert_eq!(lookup(65, 34), AnonymousScope);
+
+    // classCallbackBound@http://127.0.0.1:8080/sync.mjs:65:22
+    // at Klass.classCallbackBound (http://127.0.0.1:8080/sync.mjs:65:5)
+    // TODO:
+    // assert_eq!(lookup(65, 22), NamedScope("Klass.classCallbackSelf"));
+    // assert_eq!(lookup(65, 5), NamedScope("Klass.classCallbackSelf"));
+
+    // classCallbackSelf@http://127.0.0.1:8080/sync.mjs:61:22
+    // at Klass.classCallbackSelf (http://127.0.0.1:8080/sync.mjs:61:5)
+    // TODO:
+    // assert_eq!(lookup(61, 22), NamedScope("Klass.classCallbackSelf"));
+    // assert_eq!(lookup(61, 5), NamedScope("Klass.classCallbackSelf"));
+
+    // classMethod/<@http://127.0.0.1:8080/sync.mjs:56:12
+    // at http://127.0.0.1:8080/sync.mjs:56:12
+    // TODO: should we infer a better name here?
+    assert_eq!(lookup(56, 12), AnonymousScope);
+
+    // classMethod@http://127.0.0.1:8080/sync.mjs:55:22
+    // at Klass.classMethod (http://127.0.0.1:8080/sync.mjs:55:5)
+    // TODO:
+    // assert_eq!(lookup(55, 22), NamedScope("Klass.classMethod"));
+    // assert_eq!(lookup(55, 5), NamedScope("Klass.classMethod"));
+
+    // BaseKlass@http://127.0.0.1:8080/sync.mjs:32:10
+    // at new BaseKlass (http://127.0.0.1:8080/sync.mjs:32:10)
+    assert_eq!(lookup(32, 10), NamedScope("new BaseKlass"));
+
+    // Klass@http://127.0.0.1:8080/sync.mjs:50:5
+    // at new Klass (http://127.0.0.1:8080/sync.mjs:50:5)
+    assert_eq!(lookup(50, 5), NamedScope("new Klass"));
+
+    // arrowFn/namedDeclaredCallback/namedImmediateCallback/</<@http://127.0.0.1:8080/sync.mjs:22:17
+    // at http://127.0.0.1:8080/sync.mjs:22:17
+    // TODO: should we infer a better name here?
+    assert_eq!(lookup(22, 17), AnonymousScope);
+
+    // arrowFn/namedDeclaredCallback/namedImmediateCallback/<@http://127.0.0.1:8080/sync.mjs:21:26
+    // at http://127.0.0.1:8080/sync.mjs:21:9
+    // TODO: should we infer a better name here?
+    assert_eq!(lookup(21, 26), AnonymousScope);
+    assert_eq!(lookup(21, 9), AnonymousScope);
+
+    // namedImmediateCallback@http://127.0.0.1:8080/sync.mjs:19:24
+    // at namedImmediateCallback (http://127.0.0.1:8080/sync.mjs:19:7)
+    assert_eq!(lookup(19, 24), NamedScope("namedImmediateCallback"));
+    assert_eq!(lookup(19, 7), NamedScope("namedImmediateCallback"));
+
+    // namedDeclaredCallback@http://127.0.0.1:8080/sync.mjs:17:22
+    // at namedDeclaredCallback (http://127.0.0.1:8080/sync.mjs:17:5)
+    assert_eq!(lookup(17, 22), NamedScope("namedDeclaredCallback"));
+    assert_eq!(lookup(17, 5), NamedScope("namedDeclaredCallback"));
+
+    // arrowFn@http://127.0.0.1:8080/sync.mjs:27:20
+    // at arrowFn (http://127.0.0.1:8080/sync.mjs:27:3)
+    assert_eq!(lookup(27, 20), NamedScope("arrowFn"));
+    assert_eq!(lookup(27, 3), NamedScope("arrowFn"));
+
+    // anonFn@http://127.0.0.1:8080/sync.mjs:12:3
+    // at anonFn (http://127.0.0.1:8080/sync.mjs:12:3)
+    assert_eq!(lookup(12, 3), NamedScope("anonFn"));
+
+    // namedFnExpr@http://127.0.0.1:8080/sync.mjs:8:3
+    // at namedFnExpr (http://127.0.0.1:8080/sync.mjs:8:3)
+    assert_eq!(lookup(8, 3), NamedScope("namedFnExpr"));
+
+    // namedFn@http://127.0.0.1:8080/sync.mjs:4:3
+    // at namedFn (http://127.0.0.1:8080/sync.mjs:4:3)
+    assert_eq!(lookup(4, 3), NamedScope("namedFn"));
 }
 
 /*

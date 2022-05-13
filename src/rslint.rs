@@ -12,7 +12,7 @@ pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<String>)> {
         rslint_parser::parse_text(src, 0);
 
     let syntax = parse.syntax();
-    //dbg!(&syntax);
+    // dbg!(&syntax);
 
     let mut ranges = vec![];
 
@@ -35,13 +35,40 @@ pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<String>)> {
             let name = find_fn_name_from_ctx(&node);
 
             ranges.push((convert_text_range(node.text_range()), name));
+        } else if let Some(class_decl) = node.try_to::<ast::ClassDecl>() {
+            // NOTE: instead of going for the `constructor`, we will cover the
+            // whole class body, as class property definitions are executed as
+            // part of the constructor.
+
+            let name = class_decl
+                .name()
+                .map(|n| n.text())
+                .or_else(|| find_fn_name_from_ctx(&node))
+                .map(|mut s| {
+                    s.insert_str(0, "new ");
+                    s
+                });
+
+            ranges.push((convert_text_range(node.text_range()), name));
+        } else if let Some(class_expr) = node.try_to::<ast::ClassExpr>() {
+            // Same here, see NOTE above.
+
+            let name = class_expr
+                .name()
+                .map(|n| n.text())
+                .or_else(|| find_fn_name_from_ctx(&node))
+                .map(|mut s| {
+                    s.insert_str(0, "new ");
+                    s
+                });
+
+            ranges.push((convert_text_range(node.text_range()), name));
         }
 
         // TODO: method, constructor
 
         /*match node.kind() {
             SyntaxKind::METHOD => todo!(),
-            SyntaxKind::CONSTRUCTOR => todo!(),
             _ => todo!(),
         }*/
     }
