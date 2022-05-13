@@ -24,13 +24,11 @@ fn resolves_fn_names() {
 
     // objectLiteralAnon@http://127.0.0.1:8080/sync.mjs:84:11
     // at Object.objectLiteralAnon (http://127.0.0.1:8080/sync.mjs:84:11)
-    // TODO:
-    // assert_eq!(lookup(84, 11), NamedScope(""));
+    assert_eq!(lookup(84, 11), NamedScope("obj.objectLiteralAnon"));
 
     // objectLiteralMethod@http://127.0.0.1:8080/sync.mjs:81:9
     // at Object.objectLiteralMethod (http://127.0.0.1:8080/sync.mjs:81:9)
-    // TODO:
-    // assert_eq!(lookup(81, 9), NamedScope(""));
+    assert_eq!(lookup(81, 9), NamedScope("obj.objectLiteralMethod"));
 
     // localReassign@http://127.0.0.1:8080/sync.mjs:76:7
     // at localReassign (http://127.0.0.1:8080/sync.mjs:76:7)

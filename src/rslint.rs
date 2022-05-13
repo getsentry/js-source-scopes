@@ -113,22 +113,29 @@ fn find_fn_name_from_ctx(node: &SyntaxNode) -> Option<String> {
             | SyntaxKind::CONSTRUCTOR => return None,
             _ => {}
         }
-        // if we already have a method name, we are looking for a class name to
-        // put in front of it.
-        if let Some(class_decl) = parent.try_to::<ast::ClassDecl>() {
+        if let Some(prop) = parent.try_to::<ast::LiteralProp>() {
+            let name = prop.key().map(|n| n.text());
+            if let Some(name) = name {
+                names.push(name);
+            }
+        } else if let Some(class_decl) = parent.try_to::<ast::ClassDecl>() {
             let name = class_decl.name().map(|n| n.text());
             if let Some(name) = name {
                 names.push(name);
                 return join_names(&names);
             }
-        }
-        if let Some(assign_expr) = parent.try_to::<ast::AssignExpr>() {
+        } else if let Some(assign_expr) = parent.try_to::<ast::AssignExpr>() {
             if let Some(ast::PatternOrExpr::Expr(expr)) = assign_expr.lhs() {
-                return Some(text_of_node(expr.syntax()));
+                names.push(text_of_node(expr.syntax()));
+                return join_names(&names);
             }
         } else if let Some(decl) = parent.try_to::<ast::Declarator>() {
             if let Some(ast::Pattern::SinglePattern(sp)) = decl.pattern() {
-                return sp.name().map(|n| n.text());
+                let name = sp.name().map(|n| n.text());
+                if let Some(name) = name {
+                    names.push(name);
+                    return join_names(&names);
+                }
             }
         }
     }
