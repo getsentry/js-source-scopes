@@ -7,6 +7,7 @@ fn resolves_fn_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
     let scopes = extract_scope_names(&src);
+    // dbg!(&scopes);
     let index = ScopeIndex::new(scopes).unwrap();
 
     let ctx = SourceContext::new(&src).unwrap();
@@ -44,31 +45,26 @@ fn resolves_fn_names() {
 
     // #privateMethod@http://127.0.0.1:8080/sync.mjs:40:10
     // at Klass.#privateMethod (http://127.0.0.1:8080/sync.mjs:40:10)
-    // TODO:
-    // assert_eq!(lookup(40, 10), NamedScope("BaseKlass.#privateMethod"));
+    assert_eq!(lookup(40, 10), NamedScope("BaseKlass.#privateMethod"));
 
     // classCallbackArrow@http://127.0.0.1:8080/sync.mjs:36:24
     // at Klass.classCallbackArrow (http://127.0.0.1:8080/sync.mjs:36:24)
-    // TODO:
-    // assert_eq!(lookup(36, 24), NamedScope("Klass.classCallbackArrow"));
+    assert_eq!(lookup(36, 24), NamedScope("BaseKlass.classCallbackArrow"));
 
     // classCallbackBound/<@http://127.0.0.1:8080/sync.mjs:65:34
     // at http://127.0.0.1:8080/sync.mjs:65:34
     // TODO: should we infer a better name here?
     assert_eq!(lookup(65, 34), AnonymousScope);
-    assert_eq!(lookup(65, 34), AnonymousScope);
 
     // classCallbackBound@http://127.0.0.1:8080/sync.mjs:65:22
     // at Klass.classCallbackBound (http://127.0.0.1:8080/sync.mjs:65:5)
-    // TODO:
-    // assert_eq!(lookup(65, 22), NamedScope("Klass.classCallbackSelf"));
-    // assert_eq!(lookup(65, 5), NamedScope("Klass.classCallbackSelf"));
+    assert_eq!(lookup(65, 22), NamedScope("Klass.classCallbackBound"));
+    assert_eq!(lookup(65, 5), NamedScope("Klass.classCallbackBound"));
 
     // classCallbackSelf@http://127.0.0.1:8080/sync.mjs:61:22
     // at Klass.classCallbackSelf (http://127.0.0.1:8080/sync.mjs:61:5)
-    // TODO:
-    // assert_eq!(lookup(61, 22), NamedScope("Klass.classCallbackSelf"));
-    // assert_eq!(lookup(61, 5), NamedScope("Klass.classCallbackSelf"));
+    assert_eq!(lookup(61, 22), NamedScope("Klass.classCallbackSelf"));
+    assert_eq!(lookup(61, 5), NamedScope("Klass.classCallbackSelf"));
 
     // classMethod/<@http://127.0.0.1:8080/sync.mjs:56:12
     // at http://127.0.0.1:8080/sync.mjs:56:12
@@ -77,9 +73,8 @@ fn resolves_fn_names() {
 
     // classMethod@http://127.0.0.1:8080/sync.mjs:55:22
     // at Klass.classMethod (http://127.0.0.1:8080/sync.mjs:55:5)
-    // TODO:
-    // assert_eq!(lookup(55, 22), NamedScope("Klass.classMethod"));
-    // assert_eq!(lookup(55, 5), NamedScope("Klass.classMethod"));
+    assert_eq!(lookup(55, 22), NamedScope("Klass.classMethod"));
+    assert_eq!(lookup(55, 5), NamedScope("Klass.classMethod"));
 
     // BaseKlass@http://127.0.0.1:8080/sync.mjs:32:10
     // at new BaseKlass (http://127.0.0.1:8080/sync.mjs:32:10)
@@ -88,6 +83,10 @@ fn resolves_fn_names() {
     // Klass@http://127.0.0.1:8080/sync.mjs:50:5
     // at new Klass (http://127.0.0.1:8080/sync.mjs:50:5)
     assert_eq!(lookup(50, 5), NamedScope("new Klass"));
+
+    // staticMethod@http://127.0.0.1:8080/sync.mjs:46:5
+    // at Function.staticMethod (http://127.0.0.1:8080/sync.mjs:46:5)
+    assert_eq!(lookup(46, 5), NamedScope("Klass.staticMethod"));
 
     // arrowFn/namedDeclaredCallback/namedImmediateCallback/</<@http://127.0.0.1:8080/sync.mjs:22:17
     // at http://127.0.0.1:8080/sync.mjs:22:17
