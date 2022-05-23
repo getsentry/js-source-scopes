@@ -8,6 +8,10 @@ fn resolves_fn_names() {
 
     let scopes = extract_scope_names(&src);
     // dbg!(&scopes);
+    let scopes: Vec<_> = scopes
+        .into_iter()
+        .map(|s| (s.0, s.1.map(|n| n.to_string())))
+        .collect();
     let index = ScopeIndex::new(scopes).unwrap();
 
     let ctx = SourceContext::new(&src).unwrap();

@@ -8,6 +8,7 @@ mod scope_name;
 mod source;
 
 pub use lookup::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
+pub use scope_name::{NameComponent, ScopeName};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.
@@ -29,20 +30,24 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// ```
 /// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
 /// //                arrowFnExpr -^------^  ^------namedFnDecl------^
-/// let mut scopes = js_source_scopes::extract_scope_names(src);
+/// let mut scopes: Vec<_> = js_source_scopes::extract_scope_names(src)
+///     .into_iter()
+///     .map(|res| {
+///         let components = res.1.map(|n| n.components().map(|c| {
+///             (c.text().to_string(), c.range())
+///         }).collect::<Vec<_>>());
+///         (res.0, components)
+///     }).collect();
 /// scopes.sort_by_key(|s| s.0.start);
 ///
 /// let expected = vec![
-///   (20..28, Some(String::from("arrowFnExpr"))),
-///   (30..55, Some(String::from("namedFnDecl"))),
+///   (20..28, Some(vec![(String::from("arrowFnExpr"), Some(6..17))])),
+///   (30..55, Some(vec![(String::from("namedFnDecl"),Some(39..50))])),
 /// ];
 /// assert_eq!(scopes, expected);
 /// ```
-pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
+pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<ScopeName>)> {
     rslint::parse_with_rslint(src)
-        .into_iter()
-        .map(|res| (res.0, res.1.map(|s| s.to_string())))
-        .collect()
 }
 
 // TODO: maybe see if swc makes scope extraction easier / faster ?
