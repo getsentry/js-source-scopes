@@ -4,6 +4,7 @@ use std::ops::Range;
 
 mod lookup;
 mod rslint;
+mod scope_name;
 mod source;
 
 pub use lookup::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
@@ -39,6 +40,9 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// ```
 pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<String>)> {
     rslint::parse_with_rslint(src)
+        .into_iter()
+        .map(|res| (res.0, res.1.map(|s| s.to_string())))
+        .collect()
 }
 
 // TODO: maybe see if swc makes scope extraction easier / faster ?

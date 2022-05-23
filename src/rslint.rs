@@ -2,11 +2,9 @@ use std::ops::Range;
 
 use rslint_parser::{ast, AstNode, SyntaxKind, SyntaxNode, SyntaxNodeExt, TextRange};
 
-fn convert_text_range(range: TextRange) -> Range<u32> {
-    range.start().into()..range.end().into()
-}
+use crate::scope_name::{NameComponent, ScopeName};
 
-pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<String>)> {
+pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<ScopeName>)> {
     let parse =
         //rslint_parser::parse_with_syntax(src, 0, rslint_parser::FileKind::TypeScript.into());
         rslint_parser::parse_text(src, 0);
@@ -18,55 +16,63 @@ pub fn parse_with_rslint(src: &str) -> Vec<(Range<u32>, Option<String>)> {
 
     for node in syntax.descendants() {
         if let Some(fn_decl) = node.try_to::<ast::FnDecl>() {
-            let name = fn_decl
-                .name()
-                .map(|n| n.text())
-                .or_else(|| find_fn_name_from_ctx(&node));
-
-            ranges.push((convert_text_range(node.text_range()), name));
+            ranges.push(node_range_and_name(&node, fn_decl.name()))
         } else if let Some(fn_expr) = node.try_to::<ast::FnExpr>() {
-            let name = fn_expr
-                .name()
-                .map(|n| n.text())
-                .or_else(|| find_fn_name_from_ctx(&node));
-
-            ranges.push((convert_text_range(node.text_range()), name));
+            ranges.push(node_range_and_name(&node, fn_expr.name()))
         } else if let Some(class_decl) = node.try_to::<ast::ClassDecl>() {
             // NOTE: instead of going for the `constructor`, we will cover the
             // whole class body, as class property definitions are executed as
             // part of the constructor.
 
-            let name = class_decl
-                .name()
-                .map(|n| n.text())
-                .or_else(|| find_fn_name_from_ctx(&node))
-                .map(|mut s| {
-                    s.insert_str(0, "new ");
-                    s
-                });
-
-            ranges.push((convert_text_range(node.text_range()), name));
+            ranges.push(node_range_and_name(&node, class_decl.name()));
         } else if let Some(class_expr) = node.try_to::<ast::ClassExpr>() {
             // Same here, see NOTE above.
 
-            let name = class_expr
-                .name()
-                .map(|n| n.text())
-                .or_else(|| find_fn_name_from_ctx(&node))
-                .map(|mut s| {
-                    s.insert_str(0, "new ");
-                    s
-                });
-
-            ranges.push((convert_text_range(node.text_range()), name));
+            ranges.push(node_range_and_name(&node, class_expr.name()));
         } else if node.is::<ast::ArrowExpr>() || node.is::<ast::Method>() {
-            let name = find_fn_name_from_ctx(&node);
-
-            ranges.push((convert_text_range(node.text_range()), name));
+            ranges.push(node_range_and_name(&node, None));
         }
     }
 
     ranges
+}
+
+fn node_range_and_name(
+    node: &SyntaxNode,
+    name: Option<ast::Name>,
+) -> (Range<u32>, Option<ScopeName>) {
+    let mut name = if let Some(name) = name {
+        let tokens = name
+            .syntax()
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token());
+
+        let mut name = ScopeName::new();
+
+        for t in tokens {
+            name.components.push_back(NameComponent::token(t));
+        }
+
+        Some(name)
+    } else {
+        find_name_from_ctx(node).map(|n| {
+            let mut name = ScopeName::new();
+            name.components.push_back(NameComponent::compat(n));
+            name
+        })
+    };
+
+    if node.is::<ast::ClassDecl>() || node.is::<ast::ClassExpr>() {
+        if let Some(name) = &mut name {
+            name.components.push_front(NameComponent::interp("new "));
+        }
+    }
+
+    dbg!((convert_text_range(node.text_range()), name))
+}
+
+fn convert_text_range(range: TextRange) -> Range<u32> {
+    range.start().into()..range.end().into()
 }
 
 /// Joins a reverse list of Identifiers using `.`.
@@ -88,7 +94,7 @@ fn join_names(names: &[impl std::borrow::Borrow<str>]) -> Option<String> {
 }
 
 /// Tries to infer a name for `node` by walking up the chain of ancestors.
-fn find_fn_name_from_ctx(node: &SyntaxNode) -> Option<String> {
+fn find_name_from_ctx(node: &SyntaxNode) -> Option<String> {
     // TODO: maybe reuse an allocation here?
     let mut names = vec![];
 
