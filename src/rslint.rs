@@ -183,7 +183,7 @@ fn find_name_of_expr(mut expr: ast::Expr) -> Option<ScopeName> {
                 }
             }
 
-            ast::Expr::ThisExpr(this_expr) => {
+            ast::Expr::ThisExpr(_) => {
                 scope_name
                     .components
                     .push_front(NameComponent::interp("this"));
