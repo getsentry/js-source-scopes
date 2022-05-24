@@ -112,11 +112,11 @@ impl<T: AsRef<str>> SourceContext<T> {
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct SourcePosition {
     /// Line in the source file, 0-based.
-    line: u32,
+    pub line: u32,
     /// Column in the source file, 0-based.
     ///
     /// The column is given in UTF-16 code points.
-    column: u32,
+    pub column: u32,
 }
 
 impl SourcePosition {

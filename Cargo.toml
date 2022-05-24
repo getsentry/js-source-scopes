@@ -7,3 +7,6 @@ edition = "2021"
 #swc_ecma_parser = "0.103.0"
 rslint_parser = "0.3.1"
 indexmap = "1.7.0"
+
+[dev-dependencies]
+sourcemap = "6.0.2"
