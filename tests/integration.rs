@@ -1,10 +1,10 @@
 use js_source_scopes::{
-    extract_scope_names, NameComponent, ScopeIndex, ScopeLookupResult, SourceContext,
-    SourcePosition,
+    extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SmCache, SourceContext,
+    SourceLocation, SourcePosition,
 };
 
 #[test]
-fn resolves_fn_names() {
+fn resolves_scope_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
     let scopes = extract_scope_names(&src);
@@ -141,20 +141,12 @@ fn resolves_token_from_names() {
     let scopes = extract_scope_names(&minified);
     // dbg!(&scopes);
 
-    let try_map_token = |c: &NameComponent| {
-        let range = c.range()?;
-        let source_position = ctx.offset_to_position(range.start)?;
-        let token = sm.lookup_token(source_position.line, source_position.column)?;
-        token.get_name()
-    };
+    let resolver = NameResolver::new(&ctx, &sm);
 
     let resolved_scopes = scopes.into_iter().map(|(range, name)| {
         let minified_name = name.as_ref().map(|n| n.to_string());
-        let original_name = name.map(|name| {
-            name.components()
-                .map(|c| try_map_token(c).unwrap_or(c.text()))
-                .collect::<String>()
-        });
+        let original_name = name.map(|n| resolver.resolve_name(&n));
+
         (range, minified_name, original_name)
     });
 
@@ -163,4 +155,64 @@ fn resolves_token_from_names() {
         println!("  minified: {minified:?}");
         println!("  original: {original:?}");
     }
+}
+
+#[test]
+fn resolves_location_from_cache() {
+    let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
+    let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
+
+    let cache = SmCache::new(&minified, &map).unwrap();
+
+    use ScopeLookupResult::*;
+    let lookup = |l: u32, c: u32| {
+        // NOTE: the browsers use 1-based line/column numbers, while the crates uses
+        // 0-based numbers everywhere
+        cache.lookup(SourcePosition::new(l - 1, c - 1))
+    };
+
+    assert_eq!(
+        lookup(1, 50),
+        Some(SourceLocation {
+            file: Some("../src/constants.js"),
+            line: 2,
+            scope: Unknown,
+        })
+    );
+
+    assert_eq!(
+        lookup(1, 133),
+        Some(SourceLocation {
+            file: Some("../src/util.js"),
+            line: 11,
+            scope: NamedScope("assign")
+        })
+    );
+
+    assert_eq!(
+        lookup(1, 482),
+        Some(SourceLocation {
+            file: Some("../src/create-element.js"),
+            line: 39,
+            scope: NamedScope("createElement")
+        })
+    );
+
+    assert_eq!(
+        lookup(1, 9780),
+        Some(SourceLocation {
+            file: Some("../src/component.js"),
+            line: 181,
+            scope: Unknown
+        })
+    );
+
+    assert_eq!(
+        lookup(1, 9795),
+        Some(SourceLocation {
+            file: Some("../src/create-context.js"),
+            line: 2,
+            scope: Unknown
+        })
+    );
 }

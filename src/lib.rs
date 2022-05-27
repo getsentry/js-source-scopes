@@ -5,10 +5,14 @@ use std::ops::Range;
 mod lookup;
 mod rslint;
 mod scope_name;
+mod smcache;
 mod source;
+mod sourcemap;
 
+pub use crate::sourcemap::NameResolver;
 pub use lookup::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
+pub use smcache::{SmCache, SmCacheError, SourceLocation};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.

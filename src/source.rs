@@ -109,7 +109,7 @@ impl<T: AsRef<str>> SourceContext<T> {
 }
 
 /// A line/column source position.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct SourcePosition {
     /// Line in the source file, 0-based.
     pub line: u32,

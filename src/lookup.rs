@@ -120,7 +120,7 @@ impl ScopeIndex {
 }
 
 /// The Result of a Scope lookup.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScopeLookupResult<'data> {
     /// A named function scope.
     NamedScope(&'data str),
@@ -141,7 +141,7 @@ fn unwind_scope_stack(
 ) -> Result<(), ScopeIndexError> {
     while let Some(last) = stack.pop() {
         // push a new range of the parent
-        if last.0.end < range.start {
+        if last.0.end <= range.start {
             let name_idx = stack
                 .last()
                 .map(|prev| prev.1)
@@ -159,8 +159,8 @@ fn unwind_scope_stack(
     Ok(())
 }
 
-const GLOBAL_SCOPE_SENTINEL: u32 = u32::MAX;
-const ANONYMOUS_SCOPE_SENTINEL: u32 = u32::MAX - 1;
+pub(crate) const GLOBAL_SCOPE_SENTINEL: u32 = u32::MAX;
+pub(crate) const ANONYMOUS_SCOPE_SENTINEL: u32 = u32::MAX - 1;
 
 /// An Error that can happen when building a [`ScopeIndex`].
 #[derive(Debug)]
