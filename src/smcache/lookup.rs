@@ -1,4 +1,4 @@
-//use crate::{ScopeLookupResult, SourcePosition};
+use crate::ScopeLookupResult;
 
 use std::mem;
 
