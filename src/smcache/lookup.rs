@@ -25,6 +25,16 @@ pub struct SmCache<'data> {
     string_bytes: &'data [u8],
 }
 
+impl<'data> std::fmt::Debug for SmCache<'data> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SmCache")
+            .field("version", &self.header.version)
+            .field("ranges", &self.header.num_ranges)
+            .field("string_bytes", &self.header.string_bytes)
+            .finish()
+    }
+}
+
 impl<'data> SmCache<'data> {
     pub fn parse(buf: &'data [u8]) -> Result<Self> {
         if align_to_eight(buf.as_ptr() as usize) != 0 {

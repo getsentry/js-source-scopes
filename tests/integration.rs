@@ -158,7 +158,7 @@ fn resolves_token_from_names() {
 
 #[test]
 fn writes_simple_cache() {
-    use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
+    use js_source_scopes::{SmCache, SmCacheWriter};
 
     let minified = std::fs::read_to_string("tests/fixtures/simple/minified.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/simple/minified.js.map").unwrap();
@@ -170,7 +170,7 @@ fn writes_simple_cache() {
 
     dbg!(&buf);
 
-    let cache = SmCache::parse(&buf).unwrap();
+    let _cache = SmCache::parse(&buf).unwrap();
     //dbg!(cache);
 }
 
