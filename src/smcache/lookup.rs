@@ -97,11 +97,7 @@ impl<'data> SmCache<'data> {
 
     /// Resolves a string reference to the pointed-to `&str` data.
     fn get_string(&self, offset: u32) -> Option<&'data str> {
-        if offset == u32::MAX {
-            return None;
-        }
-        let len_offset = offset as usize;
-        let reader = &mut &self.string_bytes[len_offset..];
+        let reader = &mut self.string_bytes.get(offset as usize..)?;
         let len = leb128::read::unsigned(reader).ok()? as usize;
 
         let bytes = reader.get(..len)?;
