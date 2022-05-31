@@ -1,6 +1,6 @@
-use crate::ScopeLookupResult;
-
 use std::mem;
+
+use crate::{ScopeLookupResult, SourcePosition};
 
 use super::raw;
 
@@ -28,7 +28,9 @@ pub struct SmCache<'data> {
 
 impl<'data> SmCache<'data> {
     pub fn parse(buf: &'data [u8]) -> Result<Self> {
-        if align_to_eight(buf.as_ptr() as usize) != 0 {
+        todo!()
+
+        /*if align_to_eight(buf.as_ptr() as usize) != 0 {
             return Err(Error::BufferNotAligned);
         }
 
@@ -116,7 +118,7 @@ impl<'data> SmCache<'data> {
             source_locations,
             ranges,
             string_bytes,
-        })
+        })*/
     }
 
     /// Resolves a string reference to the pointed-to `&str` data.
@@ -143,7 +145,9 @@ impl<'data> SmCache<'data> {
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        let range_idx = match self.ranges.binary_search_by_key(&sp, |r| r.0) {
+        todo!()
+
+        /*let range_idx = match self.ranges.binary_search_by_key(&sp, |r| r.0) {
             Ok(idx) => idx,
             Err(0) => 0,
             Err(idx) => idx - 1,
@@ -157,11 +161,13 @@ impl<'data> SmCache<'data> {
             .map(|s| s.as_str());
         let line = range.1.line;
         let scope = self.resolve_scope(range.1.scope_idx);
-        Some(SourceLocation { file, line, scope })
+        Some(SourceLocation { file, line, scope })*/
     }
 
     fn resolve_scope(&self, scope_idx: u32) -> ScopeLookupResult {
-        if scope_idx == GLOBAL_SCOPE_SENTINEL {
+        todo!()
+
+        /*if scope_idx == GLOBAL_SCOPE_SENTINEL {
             ScopeLookupResult::Unknown
         } else if scope_idx == ANONYMOUS_SCOPE_SENTINEL {
             ScopeLookupResult::AnonymousScope
@@ -170,7 +176,7 @@ impl<'data> SmCache<'data> {
                 Some(name) => ScopeLookupResult::NamedScope(name.as_str()),
                 None => ScopeLookupResult::Unknown,
             }
-        }
+        }*/
     }
 }
 

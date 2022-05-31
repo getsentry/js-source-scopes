@@ -4,7 +4,10 @@ use std::io::Write;
 use sourcemap::DecodedMap;
 
 use crate::source::{SourceContext, SourceContextError};
-use crate::{extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError, ScopeLookupResult};
+use crate::{
+    extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError, ScopeLookupResult,
+    SourcePosition,
+};
 
 use super::raw;
 use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
@@ -13,14 +16,13 @@ use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
 /// to the original [`raw::SourceLocation`] it maps to.
 pub struct SmCacheWriter {
     string_bytes: Vec<u8>,
-    strings: HashMap<String, u32>,
 
-    ranges: Vec<(raw::SourcePosition, raw::SourceLocation)>,
+    ranges: Vec<(SourcePosition, raw::SourceLocation)>,
 }
 
 impl SmCacheWriter {
     /// Constructs a new Cache from a minified source file and its corresponding SourceMap.
-    pub fn new(source: &str, sourcemap: &str) -> Result<Self, SmCacheError> {
+    pub fn new(source: &str, sourcemap: &str) -> Result<Self, SmCacheWriterError> {
         // TODO: we could sprinkle a few `tracing` spans around this function to
         // figure out which step is expensive and worth optimizing:
         //
@@ -112,7 +114,7 @@ impl SmCacheWriter {
                 ScopeLookupResult::Unknown => GLOBAL_SCOPE_SENTINEL,
             };
 
-            let sl = SourceLocation {
+            let sl = raw::SourceLocation {
                 file_idx,
                 line,
                 scope_idx,
@@ -127,7 +129,6 @@ impl SmCacheWriter {
 
         Ok(Self {
             string_bytes,
-            strings,
             ranges,
         })
     }
@@ -160,7 +161,7 @@ impl SmCacheWriter {
     /// Serialize the converted data.
     ///
     /// This writes the SymCache binary format into the given [`Write`].
-    pub fn serialize<W: Write>(mut self, writer: &mut W) -> std::io::Result<()> {
+    pub fn serialize<W: Write>(self, writer: &mut W) -> std::io::Result<()> {
         let mut writer = WriteWrapper::new(writer);
 
         let num_ranges = self.ranges.len() as u32;
@@ -180,11 +181,15 @@ impl SmCacheWriter {
         writer.align()?;
 
         for (sp, _) in &self.ranges {
+            let sp = raw::SourcePosition {
+                line: sp.line,
+                column: sp.column,
+            };
             writer.write(&[sp])?;
         }
         writer.align()?;
-        for (_, sl) in &self.ranges {
-            let compressed = CompressedSourceLocation::new(sl);
+        for (_, sl) in self.ranges {
+            let compressed = raw::CompressedSourceLocation::new(sl);
             writer.write(&[compressed])?;
         }
         writer.align()?;
@@ -197,11 +202,11 @@ impl SmCacheWriter {
 
 /// An Error that can happen when building a [`SmCache`].
 #[derive(Debug)]
-pub struct SmCacheError(SmCacheErrorInner);
+pub struct SmCacheWriterError(SmCacheErrorInner);
 
-impl From<SmCacheErrorInner> for SmCacheError {
+impl From<SmCacheErrorInner> for SmCacheWriterError {
     fn from(inner: SmCacheErrorInner) -> Self {
-        SmCacheError(inner)
+        SmCacheWriterError(inner)
     }
 }
 
@@ -212,9 +217,9 @@ enum SmCacheErrorInner {
     SourceContext(SourceContextError),
 }
 
-impl std::error::Error for SmCacheError {}
+impl std::error::Error for SmCacheWriterError {}
 
-impl std::fmt::Display for SmCacheError {
+impl std::fmt::Display for SmCacheWriterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
             SmCacheErrorInner::SourceMap(e) => e.fmt(f),

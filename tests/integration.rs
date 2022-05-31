@@ -156,15 +156,37 @@ fn resolves_token_from_names() {
     }
 }
 
-/*
+#[test]
+fn writes_simple_cache() {
+    use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
+
+    let minified = std::fs::read_to_string("tests/fixtures/simple/minified.js").unwrap();
+    let map = std::fs::read_to_string("tests/fixtures/simple/minified.js.map").unwrap();
+
+    let writer = SmCacheWriter::new(&minified, &map).unwrap();
+
+    let mut buf = vec![];
+    writer.serialize(&mut buf).unwrap();
+
+    dbg!(&buf);
+
+    let cache = SmCache::parse(&buf).unwrap();
+    //dbg!(cache);
+}
+
 #[test]
 fn resolves_location_from_cache() {
-    use js_source_scopes::{SmCache,SourceLocation};
+    use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
 
     let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
 
-    let cache = SmCache::new(&minified, &map).unwrap();
+    let writer = SmCacheWriter::new(&minified, &map).unwrap();
+
+    let mut buf = vec![];
+    writer.serialize(&mut buf).unwrap();
+
+    let cache = SmCache::parse(&buf).unwrap();
 
     use ScopeLookupResult::*;
     let lookup = |l: u32, c: u32| {
@@ -218,4 +240,3 @@ fn resolves_location_from_cache() {
         })
     );
 }
-*/
