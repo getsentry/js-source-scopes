@@ -102,14 +102,18 @@ impl SmCacheWriter {
             let scope = lookup_scope(&sp);
 
             let file_idx = match file {
-                Some(file) => Self::insert_string(&mut string_bytes, &mut strings, file),
+                Some(file) => std::cmp::min(
+                    Self::insert_string(&mut string_bytes, &mut strings, file),
+                    NO_FILE_SENTINEL,
+                ),
                 None => NO_FILE_SENTINEL,
             };
 
             let scope_idx = match scope {
-                ScopeLookupResult::NamedScope(name) => {
-                    Self::insert_string(&mut string_bytes, &mut strings, name)
-                }
+                ScopeLookupResult::NamedScope(name) => std::cmp::min(
+                    Self::insert_string(&mut string_bytes, &mut strings, name),
+                    GLOBAL_SCOPE_SENTINEL,
+                ),
                 ScopeLookupResult::AnonymousScope => ANONYMOUS_SCOPE_SENTINEL,
                 ScopeLookupResult::Unknown => GLOBAL_SCOPE_SENTINEL,
             };
@@ -144,7 +148,7 @@ impl SmCacheWriter {
         s: &str,
     ) -> u32 {
         if s.is_empty() {
-            return NO_FILE_SENTINEL;
+            return u32::MAX;
         }
         if let Some(&offset) = strings.get(s) {
             return offset;
