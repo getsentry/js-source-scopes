@@ -1,4 +1,4 @@
-use std::mem;
+use std::{mem, ptr};
 
 use crate::{ScopeLookupResult, SourcePosition};
 
@@ -21,16 +21,13 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct SmCache<'data> {
     header: &'data raw::Header,
-    source_positions: &'data [raw::SourcePosition],
-    source_locations: &'data [raw::CompressedSourceLocation],
+    source_positions: &'data [(raw::SourcePosition, raw::CompressedSourceLocation)],
     string_bytes: &'data [u8],
 }
 
 impl<'data> SmCache<'data> {
     pub fn parse(buf: &'data [u8]) -> Result<Self> {
-        todo!()
-
-        /*if align_to_eight(buf.as_ptr() as usize) != 0 {
+        if align_to_eight(buf.as_ptr() as usize) != 0 {
             return Err(Error::BufferNotAligned);
         }
 
@@ -52,58 +49,28 @@ impl<'data> SmCache<'data> {
             return Err(Error::WrongVersion);
         }
 
-        let mut files_size = mem::size_of::<raw::File>() * header.num_files as usize;
-        files_size += align_to_eight(files_size);
+        let mut source_positions_size =
+            mem::size_of::<(raw::SourcePosition, raw::CompressedSourceLocation)>()
+                * header.num_ranges as usize;
+        source_positions_size += align_to_eight(source_positions_size);
 
-        let mut functions_size = mem::size_of::<raw::Function>() * header.num_functions as usize;
-        functions_size += align_to_eight(functions_size);
+        let expected_buf_size = header_size + source_positions_size + header.string_bytes as usize;
 
-        let mut source_locations_size =
-            mem::size_of::<raw::SourceLocation>() * header.num_source_locations as usize;
-        source_locations_size += align_to_eight(source_locations_size);
-
-        let mut ranges_size = mem::size_of::<raw::Range>() * header.num_ranges as usize;
-        ranges_size += align_to_eight(ranges_size);
-
-        let expected_buf_size = header_size
-            + files_size
-            + functions_size
-            + source_locations_size
-            + ranges_size
-            + header.string_bytes as usize;
-
-        if buf.len() < expected_buf_size || source_locations_size < ranges_size {
+        if buf.len() < expected_buf_size {
             return Err(Error::BadFormatLength);
         }
 
         // SAFETY: we just made sure that all the pointers we are constructing via pointer
         // arithmetic are within `buf`
-        let files_start = unsafe { buf.as_ptr().add(header_size) };
-        let functions_start = unsafe { files_start.add(files_size) };
-        let source_locations_start = unsafe { functions_start.add(functions_size) };
-        let ranges_start = unsafe { source_locations_start.add(source_locations_size) };
-        let string_bytes_start = unsafe { ranges_start.add(ranges_size) };
+        let source_positions_start = unsafe { buf.as_ptr().add(header_size) };
+        let string_bytes_start = unsafe { source_positions_start.add(source_positions_size) };
 
         // SAFETY: the above buffer size check also made sure we are not going out of bounds
         // here
-        let files = unsafe {
-            &*ptr::slice_from_raw_parts(files_start as *const raw::File, header.num_files as usize)
-        };
-        let functions = unsafe {
+        let source_positions = unsafe {
             &*ptr::slice_from_raw_parts(
-                functions_start as *const raw::Function,
-                header.num_functions as usize,
-            )
-        };
-        let source_locations = unsafe {
-            &*ptr::slice_from_raw_parts(
-                source_locations_start as *const raw::SourceLocation,
-                header.num_source_locations as usize,
-            )
-        };
-        let ranges = unsafe {
-            &*ptr::slice_from_raw_parts(
-                ranges_start as *const raw::Range,
+                source_positions_start
+                    as *const (raw::SourcePosition, raw::CompressedSourceLocation),
                 header.num_ranges as usize,
             )
         };
@@ -111,14 +78,11 @@ impl<'data> SmCache<'data> {
             &*ptr::slice_from_raw_parts(string_bytes_start, header.string_bytes as usize)
         };
 
-        Ok(SymCache {
+        Ok(SmCache {
             header,
-            files,
-            functions,
-            source_locations,
-            ranges,
+            source_positions,
             string_bytes,
-        })*/
+        })
     }
 
     /// Resolves a string reference to the pointed-to `&str` data.
@@ -127,17 +91,10 @@ impl<'data> SmCache<'data> {
             return None;
         }
         let len_offset = offset as usize;
-        let len_size = std::mem::size_of::<u32>();
-        let len = u32::from_ne_bytes(
-            self.string_bytes
-                .get(len_offset..len_offset + len_size)?
-                .try_into()
-                .unwrap(),
-        ) as usize;
+        let reader = &mut &self.string_bytes[len_offset..];
+        let len = leb128::read::unsigned(reader).ok()? as usize;
 
-        let start_offset = len_offset + len_size;
-        let end_offset = start_offset + len;
-        let bytes = self.string_bytes.get(start_offset..end_offset)?;
+        let bytes = reader.get(..len)?;
 
         std::str::from_utf8(bytes).ok()
     }
@@ -145,38 +102,30 @@ impl<'data> SmCache<'data> {
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        todo!()
-
-        /*let range_idx = match self.ranges.binary_search_by_key(&sp, |r| r.0) {
+        let idx = match self
+            .source_positions
+            .binary_search_by_key(&sp.into(), |r| r.0)
+        {
             Ok(idx) => idx,
             Err(0) => 0,
             Err(idx) => idx - 1,
         };
 
-        let range = self.ranges.get(range_idx)?;
+        let compressed = self.source_positions.get(idx)?.1;
+        let unpacked = compressed.unpack();
 
-        let file = self
-            .files
-            .get_index(range.1.file_idx as usize)
-            .map(|s| s.as_str());
-        let line = range.1.line;
-        let scope = self.resolve_scope(range.1.scope_idx);
-        Some(SourceLocation { file, line, scope })*/
-    }
+        let file = self.get_string(unpacked.file_idx);
+        let line = unpacked.line;
 
-    fn resolve_scope(&self, scope_idx: u32) -> ScopeLookupResult {
-        todo!()
+        let scope = match unpacked.scope_idx {
+            raw::GLOBAL_SCOPE_SENTINEL => ScopeLookupResult::Unknown,
+            raw::ANONYMOUS_SCOPE_SENTINEL => ScopeLookupResult::AnonymousScope,
+            _ => self
+                .get_string(unpacked.scope_idx)
+                .map_or(ScopeLookupResult::Unknown, ScopeLookupResult::NamedScope),
+        };
 
-        /*if scope_idx == GLOBAL_SCOPE_SENTINEL {
-            ScopeLookupResult::Unknown
-        } else if scope_idx == ANONYMOUS_SCOPE_SENTINEL {
-            ScopeLookupResult::AnonymousScope
-        } else {
-            match self.scopes.get_index(scope_idx as usize) {
-                Some(name) => ScopeLookupResult::NamedScope(name.as_str()),
-                None => ScopeLookupResult::Unknown,
-            }
-        }*/
+        Some(SourceLocation { file, line, scope })
     }
 }
 

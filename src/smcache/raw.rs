@@ -32,11 +32,20 @@ pub struct Header {
 }
 
 /// A lookup minified source position of line/column.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SourcePosition {
     pub line: u32,
     pub column: u32,
+}
+
+impl From<crate::source::SourcePosition> for SourcePosition {
+    fn from(sp: crate::source::SourcePosition) -> Self {
+        Self {
+            line: sp.line,
+            column: sp.column,
+        }
+    }
 }
 
 /// A compressed Source Location.

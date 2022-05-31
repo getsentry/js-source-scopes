@@ -140,7 +140,7 @@ impl SmCacheWriter {
     /// Insert a string into this converter.
     ///
     /// If the string was already present, it is not added again. A newly added string
-    /// is prefixed by its length as a `u32`. The returned `u32`
+    /// is prefixed by its length in LEB128 encoding. The returned `u32`
     /// is the offset into the `string_bytes` field where the string is saved.
     fn insert_string(
         string_bytes: &mut Vec<u8>,
@@ -164,7 +164,7 @@ impl SmCacheWriter {
 
     /// Serialize the converted data.
     ///
-    /// This writes the SymCache binary format into the given [`Write`].
+    /// This writes the SmCache binary format into the given [`Write`].
     pub fn serialize<W: Write>(self, writer: &mut W) -> std::io::Result<()> {
         let mut writer = WriteWrapper::new(writer);
 
@@ -184,17 +184,13 @@ impl SmCacheWriter {
         writer.write(&[header])?;
         writer.align()?;
 
-        for (sp, _) in &self.ranges {
+        for (sp, sl) in &self.ranges {
             let sp = raw::SourcePosition {
                 line: sp.line,
                 column: sp.column,
             };
-            writer.write(&[sp])?;
-        }
-        writer.align()?;
-        for (_, sl) in self.ranges {
-            let compressed = raw::CompressedSourceLocation::new(sl);
-            writer.write(&[compressed])?;
+            let compressed = raw::CompressedSourceLocation::new(*sl);
+            writer.write(&[(sp, compressed)])?;
         }
         writer.align()?;
 
