@@ -62,10 +62,23 @@ pub const ANONYMOUS_SCOPE_SENTINEL: u32 = (1 << COMPRESSED_SHIFT) - 2;
 
 impl CompressedSourceLocation {
     pub fn new(sl: SourceLocation) -> Self {
-        todo!()
+        let mut compressed = 0;
+        compressed |= (sl.file_idx as u64 & COMPRESSED_MASK) << (COMPRESSED_SHIFT * 2);
+        compressed |= (sl.line as u64 & COMPRESSED_MASK) << COMPRESSED_SHIFT;
+        compressed |= sl.scope_idx as u64 & COMPRESSED_MASK;
+
+        Self(compressed)
     }
     pub fn unpack(self) -> SourceLocation {
-        todo!()
+        let file_idx = (self.0 >> (COMPRESSED_SHIFT * 2) & COMPRESSED_MASK) as u32;
+        let line = (self.0 >> COMPRESSED_SHIFT & COMPRESSED_MASK) as u32;
+        let scope_idx = (self.0 & COMPRESSED_MASK) as u32;
+
+        SourceLocation {
+            file_idx,
+            line,
+            scope_idx,
+        }
     }
 }
 
@@ -95,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_sizeof() {
-        assert_eq!(mem::size_of::<Header>(), 24);
+        assert_eq!(mem::size_of::<Header>(), 28);
         assert_eq!(mem::align_of::<Header>(), 4);
 
         assert_eq!(mem::size_of::<SourcePosition>(), 8);
@@ -103,5 +116,17 @@ mod tests {
 
         assert_eq!(mem::size_of::<CompressedSourceLocation>(), 8);
         assert_eq!(mem::align_of::<CompressedSourceLocation>(), 8);
+    }
+
+    #[test]
+    fn test_unpack() {
+        let sl = SourceLocation {
+            file_idx: 1729,
+            line: 884735,
+            scope_idx: 398,
+        };
+
+        let compressed = CompressedSourceLocation::new(sl);
+        assert_eq!(compressed.unpack(), sl);
     }
 }
