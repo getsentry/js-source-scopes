@@ -184,13 +184,18 @@ impl SmCacheWriter {
         writer.write(&[header])?;
         writer.align()?;
 
-        for (sp, sl) in &self.ranges {
+        for (sp, _) in &self.ranges {
             let sp = raw::SourcePosition {
                 line: sp.line,
                 column: sp.column,
             };
+            writer.write(&[sp])?;
+        }
+        writer.align()?;
+
+        for (_, sl) in &self.ranges {
             let compressed = raw::CompressedSourceLocation::new(*sl);
-            writer.write(&[(sp, compressed)])?;
+            writer.write(&[compressed])?;
         }
         writer.align()?;
 

@@ -21,7 +21,8 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct SmCache<'data> {
     header: &'data raw::Header,
-    source_positions: &'data [(raw::SourcePosition, raw::CompressedSourceLocation)],
+    source_positions: &'data [raw::SourcePosition],
+    source_locations: &'data [raw::CompressedSourceLocation],
     string_bytes: &'data [u8],
 }
 
@@ -60,11 +61,17 @@ impl<'data> SmCache<'data> {
         }
 
         let mut source_positions_size =
-            mem::size_of::<(raw::SourcePosition, raw::CompressedSourceLocation)>()
-                * header.num_ranges as usize;
+            mem::size_of::<raw::SourcePosition>() * header.num_ranges as usize;
         source_positions_size += align_to_eight(source_positions_size);
 
-        let expected_buf_size = header_size + source_positions_size + header.string_bytes as usize;
+        let mut source_locations_size =
+            mem::size_of::<raw::CompressedSourceLocation>() * header.num_ranges as usize;
+        source_locations_size += align_to_eight(source_locations_size);
+
+        let expected_buf_size = header_size
+            + source_positions_size
+            + source_locations_size
+            + header.string_bytes as usize;
 
         if buf.len() < expected_buf_size {
             return Err(Error::BadFormatLength);
@@ -73,14 +80,20 @@ impl<'data> SmCache<'data> {
         // SAFETY: we just made sure that all the pointers we are constructing via pointer
         // arithmetic are within `buf`
         let source_positions_start = unsafe { buf.as_ptr().add(header_size) };
-        let string_bytes_start = unsafe { source_positions_start.add(source_positions_size) };
+        let source_locations_start = unsafe { source_positions_start.add(source_positions_size) };
+        let string_bytes_start = unsafe { source_locations_start.add(source_locations_size) };
 
         // SAFETY: the above buffer size check also made sure we are not going out of bounds
         // here
         let source_positions = unsafe {
             &*ptr::slice_from_raw_parts(
-                source_positions_start
-                    as *const (raw::SourcePosition, raw::CompressedSourceLocation),
+                source_positions_start as *const raw::SourcePosition,
+                header.num_ranges as usize,
+            )
+        };
+        let source_locations = unsafe {
+            &*ptr::slice_from_raw_parts(
+                source_locations_start as *const raw::CompressedSourceLocation,
                 header.num_ranges as usize,
             )
         };
@@ -91,6 +104,7 @@ impl<'data> SmCache<'data> {
         Ok(SmCache {
             header,
             source_positions,
+            source_locations,
             string_bytes,
         })
     }
@@ -108,16 +122,13 @@ impl<'data> SmCache<'data> {
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        let idx = match self
-            .source_positions
-            .binary_search_by_key(&sp.into(), |r| r.0)
-        {
+        let idx = match self.source_positions.binary_search(&sp.into()) {
             Ok(idx) => idx,
             Err(0) => 0,
             Err(idx) => idx - 1,
         };
 
-        let compressed = self.source_positions.get(idx)?.1;
+        let compressed = self.source_locations.get(idx)?;
         let unpacked = compressed.unpack();
 
         let file = self.get_string(unpacked.file_idx);
