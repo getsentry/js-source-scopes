@@ -1,4 +1,137 @@
-impl Foo {
+use std::collections::HashMap;
+use std::io::Write;
+
+use sourcemap::DecodedMap;
+
+use crate::source::{SourceContext, SourceContextError};
+use crate::{extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError, ScopeLookupResult};
+
+use super::raw;
+use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
+
+/// A structure that allows quick resolution of minified [`raw::SourcePosition`]s
+/// to the original [`raw::SourceLocation`] it maps to.
+pub struct SmCacheWriter {
+    string_bytes: Vec<u8>,
+    strings: HashMap<String, u32>,
+
+    ranges: Vec<(raw::SourcePosition, raw::SourceLocation)>,
+}
+
+impl SmCacheWriter {
+    /// Constructs a new Cache from a minified source file and its corresponding SourceMap.
+    pub fn new(source: &str, sourcemap: &str) -> Result<Self, SmCacheError> {
+        // TODO: we could sprinkle a few `tracing` spans around this function to
+        // figure out which step is expensive and worth optimizing:
+        //
+        // - sourcemap parsing/flattening
+        // - extracting scopes
+        // - resolving scopes to original names
+        // - converting the indexed scopes into line/col
+        // - actually mapping all the tokens and collecting them into the cache
+        //
+        // what _might_ be expensive is resolving original scope names and
+        // converting the `scope_index`, as the offset/position conversion is
+        // potentially an `O(n)` operation due to UTF-16 :-(
+        // so micro-optimizing that further _might_ be worth it.
+
+        let sm =
+            sourcemap::decode_slice(sourcemap.as_bytes()).map_err(SmCacheErrorInner::SourceMap)?;
+
+        // flatten the `SourceMapIndex`, as we want to iterate tokens
+        let sm = match sm {
+            DecodedMap::Regular(sm) => DecodedMap::Regular(sm),
+            DecodedMap::Index(smi) => {
+                DecodedMap::Regular(smi.flatten().map_err(SmCacheErrorInner::SourceMap)?)
+            }
+            DecodedMap::Hermes(smh) => DecodedMap::Hermes(smh),
+        };
+        let tokens = match &sm {
+            DecodedMap::Regular(sm) => sm.tokens(),
+            DecodedMap::Hermes(smh) => smh.tokens(),
+            DecodedMap::Index(_smi) => unreachable!(),
+        };
+
+        let scopes = extract_scope_names(source);
+
+        // resolve scopes to original names
+        let ctx = SourceContext::new(source).map_err(SmCacheErrorInner::SourceContext)?;
+        let resolver = NameResolver::new(&ctx, &sm);
+        let scopes: Vec<_> = scopes
+            .into_iter()
+            .map(|(range, name)| {
+                let name = name.map(|n| resolver.resolve_name(&n));
+                (range, name)
+            })
+            .collect();
+
+        // convert our offset index to a source position index
+        let scope_index = ScopeIndex::new(scopes).map_err(SmCacheErrorInner::ScopeIndex)?;
+        let scope_index: Vec<_> = scope_index
+            .iter()
+            .filter_map(|(offset, result)| {
+                let pos = ctx.offset_to_position(offset);
+                pos.map(|pos| (pos, result))
+            })
+            .collect();
+        let lookup_scope = |sp: &SourcePosition| {
+            let idx = match scope_index.binary_search_by_key(&sp, |idx| &idx.0) {
+                Ok(idx) => idx,
+                Err(0) => 0,
+                Err(idx) => idx - 1,
+            };
+            match scope_index.get(idx) {
+                Some(r) => r.1,
+                None => ScopeLookupResult::Unknown,
+            }
+        };
+
+        // iterate over the tokens and create our index
+        let mut string_bytes = Vec::new();
+        let mut strings = HashMap::new();
+        let mut ranges = Vec::new();
+
+        let mut last = None;
+        for token in tokens {
+            let (min_line, min_col) = token.get_dst();
+            let sp = SourcePosition::new(min_line, min_col);
+            let file = token.get_source();
+            let line = token.get_src_line();
+            let scope = lookup_scope(&sp);
+
+            let file_idx = match file {
+                Some(file) => Self::insert_string(&mut string_bytes, &mut strings, file),
+                None => NO_FILE_SENTINEL,
+            };
+
+            let scope_idx = match scope {
+                ScopeLookupResult::NamedScope(name) => {
+                    Self::insert_string(&mut string_bytes, &mut strings, name)
+                }
+                ScopeLookupResult::AnonymousScope => ANONYMOUS_SCOPE_SENTINEL,
+                ScopeLookupResult::Unknown => GLOBAL_SCOPE_SENTINEL,
+            };
+
+            let sl = SourceLocation {
+                file_idx,
+                line,
+                scope_idx,
+            };
+
+            if last == Some(sl) {
+                continue;
+            }
+            ranges.push((sp, sl));
+            last = Some(sl);
+        }
+
+        Ok(Self {
+            string_bytes,
+            strings,
+            ranges,
+        })
+    }
+
     /// Insert a string into this converter.
     ///
     /// If the string was already present, it is not added again. A newly added string
@@ -10,20 +143,16 @@ impl Foo {
         s: &str,
     ) -> u32 {
         if s.is_empty() {
-            return u32::MAX;
+            return NO_FILE_SENTINEL;
         }
         if let Some(&offset) = strings.get(s) {
             return offset;
         }
         let string_offset = string_bytes.len() as u32;
-        let string_len = s.len() as u32;
-        string_bytes.extend(string_len.to_ne_bytes());
+        let string_len = s.len() as u64;
+        leb128::write::unsigned(string_bytes, string_len).unwrap();
         string_bytes.extend(s.bytes());
-        // we should have written exactly `string_len + 4` bytes
-        debug_assert_eq!(
-            string_bytes.len(),
-            string_offset as usize + string_len as usize + std::mem::size_of::<u32>(),
-        );
+
         strings.insert(s.to_owned(), string_offset);
         string_offset
     }
@@ -31,7 +160,68 @@ impl Foo {
     /// Serialize the converted data.
     ///
     /// This writes the SymCache binary format into the given [`Write`].
-    pub fn serialize<W: Write>(mut self, writer: &mut W) -> std::io::Result<()> {}
+    pub fn serialize<W: Write>(mut self, writer: &mut W) -> std::io::Result<()> {
+        let mut writer = WriteWrapper::new(writer);
+
+        let num_ranges = self.ranges.len() as u32;
+        let string_bytes = self.string_bytes.len() as u32;
+
+        let header = raw::Header {
+            magic: raw::SMCACHE_MAGIC,
+            version: raw::SMCACHE_VERSION,
+
+            num_ranges,
+            string_bytes,
+
+            _reserved: [0; 12],
+        };
+
+        writer.write(&[header])?;
+        writer.align()?;
+
+        for (sp, _) in &self.ranges {
+            writer.write(&[sp])?;
+        }
+        writer.align()?;
+        for (_, sl) in &self.ranges {
+            let compressed = CompressedSourceLocation::new(sl);
+            writer.write(&[compressed])?;
+        }
+        writer.align()?;
+
+        writer.write(&self.string_bytes)?;
+
+        Ok(())
+    }
+}
+
+/// An Error that can happen when building a [`SmCache`].
+#[derive(Debug)]
+pub struct SmCacheError(SmCacheErrorInner);
+
+impl From<SmCacheErrorInner> for SmCacheError {
+    fn from(inner: SmCacheErrorInner) -> Self {
+        SmCacheError(inner)
+    }
+}
+
+#[derive(Debug)]
+enum SmCacheErrorInner {
+    SourceMap(sourcemap::Error),
+    ScopeIndex(ScopeIndexError),
+    SourceContext(SourceContextError),
+}
+
+impl std::error::Error for SmCacheError {}
+
+impl std::fmt::Display for SmCacheError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            SmCacheErrorInner::SourceMap(e) => e.fmt(f),
+            SmCacheErrorInner::ScopeIndex(e) => e.fmt(f),
+            SmCacheErrorInner::SourceContext(e) => e.fmt(f),
+        }
+    }
 }
 
 struct WriteWrapper<W> {

@@ -1,6 +1,5 @@
 use js_source_scopes::{
-    extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SmCache, SourceContext,
-    SourceLocation, SourcePosition,
+    extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
 };
 
 #[test]
@@ -157,8 +156,11 @@ fn resolves_token_from_names() {
     }
 }
 
+/*
 #[test]
 fn resolves_location_from_cache() {
+    use js_source_scopes::{SmCache,SourceLocation};
+
     let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
 
@@ -216,3 +218,4 @@ fn resolves_location_from_cache() {
         })
     );
 }
+*/

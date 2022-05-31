@@ -1,5 +1,5 @@
 /// The magic file preamble as individual bytes.
-const SMCACHE_MAGIC_BYTES: [u8; 4] = *b"SYMC";
+const SMCACHE_MAGIC_BYTES: [u8; 4] = *b"SMCA";
 
 /// The magic file preamble to identify SymCache files.
 ///
@@ -7,6 +7,9 @@ const SMCACHE_MAGIC_BYTES: [u8; 4] = *b"SYMC";
 pub const SMCACHE_MAGIC: u32 = u32::from_le_bytes(SMCACHE_MAGIC_BYTES);
 /// The byte-flipped magic, which indicates an endianness mismatch.
 pub const SMCACHE_MAGIC_FLIPPED: u32 = SMCACHE_MAGIC.swap_bytes();
+
+/// The current Format version
+pub const SMCACHE_VERSION: u32 = 1;
 
 /// The SmCache binary Header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,7 +21,7 @@ pub struct Header {
     pub version: u32,
 
     /// The number of ranges covered by this file.
-    pub ranges: u32,
+    pub num_ranges: u32,
 
     /// The total number of bytes in the string table.
     pub string_bytes: u32,
@@ -28,7 +31,7 @@ pub struct Header {
     pub _reserved: [u8; 12],
 }
 
-/// A lookup source position of line/column.
+/// A lookup minified source position of line/column.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct SourcePosition {
@@ -58,12 +61,16 @@ pub const GLOBAL_SCOPE_SENTINEL: u32 = (1 << COMPRESSED_SHIFT) - 1;
 pub const ANONYMOUS_SCOPE_SENTINEL: u32 = (1 << COMPRESSED_SHIFT) - 2;
 
 impl CompressedSourceLocation {
-    pub fn new(sl: RawSourceLocation) -> Self {}
-    pub fn unpack(self) -> RawSourceLocation {}
+    pub fn new(sl: SourceLocation) -> Self {
+        todo!()
+    }
+    pub fn unpack(self) -> SourceLocation {
+        todo!()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct RawSourceLocation {
+pub struct SourceLocation {
     pub file_idx: u32,
     pub line: u32,
     pub scope_idx: u32,
