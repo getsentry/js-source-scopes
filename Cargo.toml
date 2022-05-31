@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 #swc_ecma_parser = "0.103.0"
 rslint_parser = "0.3.1"
-indexmap = "1.7.0"
-# TODO
 sourcemap = "6.0.2"
-
+zerocopy = "0.6.1"
+leb128 = "0.2.5"

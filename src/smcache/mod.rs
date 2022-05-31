@@ -5,6 +5,10 @@ use crate::lookup::{ScopeLookupResult, ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SE
 use crate::source::{SourceContext, SourceContextError, SourcePosition};
 use crate::{extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError};
 
+mod lookup;
+mod raw;
+mod writer;
+
 /// A resolved Source Location  with file, line and scope information.
 #[derive(Debug, PartialEq)]
 pub struct SourceLocation<'data> {
