@@ -19,8 +19,8 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct SmCache<'data> {
     header: &'data raw::Header,
-    source_positions: &'data [raw::SourcePosition],
-    source_locations: &'data [raw::CompressedSourceLocation],
+    min_source_positions: &'data [raw::MinifiedSourcePosition],
+    orig_source_locations: &'data [raw::OriginalSourceLocation],
     string_bytes: &'data [u8],
 }
 
@@ -28,7 +28,7 @@ impl<'data> std::fmt::Debug for SmCache<'data> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SmCache")
             .field("version", &self.header.version)
-            .field("ranges", &self.header.num_ranges)
+            .field("mappings", &self.header.num_mappings)
             .field("string_bytes", &self.header.string_bytes)
             .finish()
     }
@@ -50,18 +50,18 @@ impl<'data> SmCache<'data> {
             return Err(Error::WrongVersion);
         }
 
-        let num_ranges = header.num_ranges as usize;
+        let num_mappings = header.num_mappings as usize;
         let string_bytes = header.string_bytes as usize;
-        let (source_positions, buf) =
-            LayoutVerified::new_slice_from_prefix(buf, num_ranges).ok_or(Error::SourcePositions)?;
-        let (source_locations, buf) =
-            LayoutVerified::new_slice_from_prefix(buf, num_ranges).ok_or(Error::SourceLocations)?;
+        let (min_source_positions, buf) = LayoutVerified::new_slice_from_prefix(buf, num_mappings)
+            .ok_or(Error::SourcePositions)?;
+        let (orig_source_locations, buf) = LayoutVerified::new_slice_from_prefix(buf, num_mappings)
+            .ok_or(Error::SourceLocations)?;
         let string_bytes = buf.get(..string_bytes).ok_or(Error::StringBytes)?;
 
         Ok(Self {
             header,
-            source_positions: source_positions.into_slice(),
-            source_locations: source_locations.into_slice(),
+            min_source_positions: min_source_positions.into_slice(),
+            orig_source_locations: orig_source_locations.into_slice(),
             string_bytes,
         })
     }
@@ -79,23 +79,22 @@ impl<'data> SmCache<'data> {
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        let idx = match self.source_positions.binary_search(&sp.into()) {
+        let idx = match self.min_source_positions.binary_search(&sp.into()) {
             Ok(idx) => idx,
             Err(0) => 0,
             Err(idx) => idx - 1,
         };
 
-        let compressed = self.source_locations.get(idx)?;
-        let unpacked = compressed.unpack();
+        let sl = self.orig_source_locations.get(idx)?;
 
-        let file = self.get_string(unpacked.file_idx);
-        let line = unpacked.line;
+        let file = self.get_string(sl.file_idx);
+        let line = sl.line;
 
-        let scope = match unpacked.scope_idx {
+        let scope = match sl.scope_idx {
             raw::GLOBAL_SCOPE_SENTINEL => ScopeLookupResult::Unknown,
             raw::ANONYMOUS_SCOPE_SENTINEL => ScopeLookupResult::AnonymousScope,
-            _ => self
-                .get_string(unpacked.scope_idx)
+            idx => self
+                .get_string(idx)
                 .map_or(ScopeLookupResult::Unknown, ScopeLookupResult::NamedScope),
         };
 
