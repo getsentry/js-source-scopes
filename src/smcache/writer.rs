@@ -17,7 +17,7 @@ use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
 pub struct SmCacheWriter {
     string_bytes: Vec<u8>,
 
-    ranges: Vec<(SourcePosition, raw::SourceLocation)>,
+    ranges: Vec<(SourcePosition, raw::OriginalSourceLocation)>,
 }
 
 impl SmCacheWriter {
@@ -118,7 +118,7 @@ impl SmCacheWriter {
                 ScopeLookupResult::Unknown => GLOBAL_SCOPE_SENTINEL,
             };
 
-            let sl = raw::SourceLocation {
+            let sl = raw::OriginalSourceLocation {
                 file_idx,
                 line,
                 scope_idx,
@@ -175,7 +175,7 @@ impl SmCacheWriter {
             magic: raw::SMCACHE_MAGIC,
             version: raw::SMCACHE_VERSION,
 
-            num_ranges,
+            num_mappings: num_ranges,
             string_bytes,
 
             _reserved: [0; 12],
@@ -185,7 +185,7 @@ impl SmCacheWriter {
         writer.align()?;
 
         for (sp, _) in &self.ranges {
-            let sp = raw::SourcePosition {
+            let sp = raw::MinifiedSourcePosition {
                 line: sp.line,
                 column: sp.column,
             };
@@ -193,9 +193,8 @@ impl SmCacheWriter {
         }
         writer.align()?;
 
-        for (_, sl) in &self.ranges {
-            let compressed = raw::CompressedSourceLocation::new(*sl);
-            writer.write(&[compressed])?;
+        for (_, orig_sl) in &self.ranges {
+            writer.write(&[orig_sl])?;
         }
         writer.align()?;
 

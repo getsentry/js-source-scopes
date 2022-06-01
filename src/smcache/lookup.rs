@@ -21,8 +21,8 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct SmCache<'data> {
     header: &'data raw::Header,
-    source_positions: &'data [raw::SourcePosition],
-    source_locations: &'data [raw::CompressedSourceLocation],
+    min_source_positions: &'data [raw::MinifiedSourcePosition],
+    orig_source_locations: &'data [raw::OriginalSourceLocation],
     string_bytes: &'data [u8],
 }
 
@@ -30,7 +30,7 @@ impl<'data> std::fmt::Debug for SmCache<'data> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SmCache")
             .field("version", &self.header.version)
-            .field("ranges", &self.header.num_ranges)
+            .field("mappings", &self.header.num_mappings)
             .field("string_bytes", &self.header.string_bytes)
             .finish()
     }
@@ -60,17 +60,17 @@ impl<'data> SmCache<'data> {
             return Err(Error::WrongVersion);
         }
 
-        let mut source_positions_size =
-            mem::size_of::<raw::SourcePosition>() * header.num_ranges as usize;
-        source_positions_size += align_to_eight(source_positions_size);
+        let mut min_source_positions_size =
+            mem::size_of::<raw::MinifiedSourcePosition>() * header.num_mappings as usize;
+        min_source_positions_size += align_to_eight(min_source_positions_size);
 
-        let mut source_locations_size =
-            mem::size_of::<raw::CompressedSourceLocation>() * header.num_ranges as usize;
-        source_locations_size += align_to_eight(source_locations_size);
+        let mut orig_source_locations_size =
+            mem::size_of::<raw::OriginalSourceLocation>() * header.num_mappings as usize;
+        orig_source_locations_size += align_to_eight(orig_source_locations_size);
 
         let expected_buf_size = header_size
-            + source_positions_size
-            + source_locations_size
+            + min_source_positions_size
+            + orig_source_locations_size
             + header.string_bytes as usize;
 
         if buf.len() < expected_buf_size {
@@ -79,22 +79,24 @@ impl<'data> SmCache<'data> {
 
         // SAFETY: we just made sure that all the pointers we are constructing via pointer
         // arithmetic are within `buf`
-        let source_positions_start = unsafe { buf.as_ptr().add(header_size) };
-        let source_locations_start = unsafe { source_positions_start.add(source_positions_size) };
-        let string_bytes_start = unsafe { source_locations_start.add(source_locations_size) };
+        let min_source_positions_start = unsafe { buf.as_ptr().add(header_size) };
+        let orig_source_locations_start =
+            unsafe { min_source_positions_start.add(min_source_positions_size) };
+        let string_bytes_start =
+            unsafe { orig_source_locations_start.add(orig_source_locations_size) };
 
         // SAFETY: the above buffer size check also made sure we are not going out of bounds
         // here
-        let source_positions = unsafe {
+        let min_source_positions = unsafe {
             &*ptr::slice_from_raw_parts(
-                source_positions_start as *const raw::SourcePosition,
-                header.num_ranges as usize,
+                min_source_positions_start as *const raw::MinifiedSourcePosition,
+                header.num_mappings as usize,
             )
         };
-        let source_locations = unsafe {
+        let orig_source_locations = unsafe {
             &*ptr::slice_from_raw_parts(
-                source_locations_start as *const raw::CompressedSourceLocation,
-                header.num_ranges as usize,
+                orig_source_locations_start as *const raw::OriginalSourceLocation,
+                header.num_mappings as usize,
             )
         };
         let string_bytes = unsafe {
@@ -103,8 +105,8 @@ impl<'data> SmCache<'data> {
 
         Ok(SmCache {
             header,
-            source_positions,
-            source_locations,
+            min_source_positions,
+            orig_source_locations,
             string_bytes,
         })
     }
@@ -122,23 +124,22 @@ impl<'data> SmCache<'data> {
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        let idx = match self.source_positions.binary_search(&sp.into()) {
+        let idx = match self.min_source_positions.binary_search(&sp.into()) {
             Ok(idx) => idx,
             Err(0) => 0,
             Err(idx) => idx - 1,
         };
 
-        let compressed = self.source_locations.get(idx)?;
-        let unpacked = compressed.unpack();
+        let sl = self.orig_source_locations.get(idx)?;
 
-        let file = self.get_string(unpacked.file_idx);
-        let line = unpacked.line;
+        let file = self.get_string(sl.file_idx);
+        let line = sl.line;
 
-        let scope = match unpacked.scope_idx {
+        let scope = match sl.scope_idx {
             raw::GLOBAL_SCOPE_SENTINEL => ScopeLookupResult::Unknown,
             raw::ANONYMOUS_SCOPE_SENTINEL => ScopeLookupResult::AnonymousScope,
-            _ => self
-                .get_string(unpacked.scope_idx)
+            idx => self
+                .get_string(idx)
                 .map_or(ScopeLookupResult::Unknown, ScopeLookupResult::NamedScope),
         };
 

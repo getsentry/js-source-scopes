@@ -170,8 +170,8 @@ fn writes_simple_cache() {
 
     dbg!(&buf);
 
-    let _cache = SmCache::parse(&buf).unwrap();
-    //dbg!(cache);
+    let cache = SmCache::parse(&buf).unwrap();
+    dbg!(cache);
 }
 
 #[test]
