@@ -1,41 +1,29 @@
-use indexmap::IndexSet;
+use std::collections::HashMap;
+use std::io::Write;
+
 use sourcemap::DecodedMap;
+use zerocopy::AsBytes;
 
-use crate::lookup::{ScopeLookupResult, ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL};
-use crate::source::{SourceContext, SourceContextError, SourcePosition};
-use crate::{extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError};
+use crate::source::{SourceContext, SourceContextError};
+use crate::{
+    extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError, ScopeLookupResult,
+    SourcePosition,
+};
 
-/// A resolved Source Location  with file, line and scope information.
-#[derive(Debug, PartialEq)]
-pub struct SourceLocation<'data> {
-    /// The source file this location belongs to.
-    pub file: Option<&'data str>,
-    /// The source line.
-    pub line: u32,
-    /// The scope containing this source location.
-    pub scope: ScopeLookupResult<'data>,
+use super::raw;
+use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
+
+/// A structure that allows quick resolution of minified [`raw::SourcePosition`]s
+/// to the original [`raw::SourceLocation`] it maps to.
+pub struct SmCacheWriter {
+    string_bytes: Vec<u8>,
+
+    mappings: Vec<(SourcePosition, raw::OriginalSourceLocation)>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct RawSourceLocation {
-    file_idx: u32,
-    line: u32,
-    scope_idx: u32,
-}
-
-const NO_FILE_SENTINEL: u32 = u32::MAX;
-
-/// A structure that allows quick resolution of minified [`SourcePosition`]s
-/// to the original [`SourceLocation`] it maps to.
-pub struct SmCache {
-    files: IndexSet<String>,
-    scopes: IndexSet<String>,
-    ranges: Vec<(SourcePosition, RawSourceLocation)>,
-}
-
-impl SmCache {
+impl SmCacheWriter {
     /// Constructs a new Cache from a minified source file and its corresponding SourceMap.
-    pub fn new(source: &str, sourcemap: &str) -> Result<Self, SmCacheError> {
+    pub fn new(source: &str, sourcemap: &str) -> Result<Self, SmCacheWriterError> {
         // TODO: we could sprinkle a few `tracing` spans around this function to
         // figure out which step is expensive and worth optimizing:
         //
@@ -102,8 +90,8 @@ impl SmCache {
         };
 
         // iterate over the tokens and create our index
-        let mut files = IndexSet::new();
-        let mut scopes = IndexSet::new();
+        let mut string_bytes = Vec::new();
+        let mut strings = HashMap::new();
         let mut ranges = Vec::new();
 
         let mut last = None;
@@ -115,23 +103,23 @@ impl SmCache {
             let scope = lookup_scope(&sp);
 
             let file_idx = match file {
-                Some(file) => match files.get_index_of(file) {
-                    Some(idx) => idx as u32,
-                    None => files.insert_full(file.to_owned()).0 as u32,
-                },
+                Some(file) => std::cmp::min(
+                    Self::insert_string(&mut string_bytes, &mut strings, file),
+                    NO_FILE_SENTINEL,
+                ),
                 None => NO_FILE_SENTINEL,
             };
 
             let scope_idx = match scope {
-                ScopeLookupResult::NamedScope(name) => match scopes.get_index_of(name) {
-                    Some(idx) => idx as u32,
-                    None => scopes.insert_full(name.to_owned()).0 as u32,
-                },
+                ScopeLookupResult::NamedScope(name) => std::cmp::min(
+                    Self::insert_string(&mut string_bytes, &mut strings, name),
+                    GLOBAL_SCOPE_SENTINEL,
+                ),
                 ScopeLookupResult::AnonymousScope => ANONYMOUS_SCOPE_SENTINEL,
                 ScopeLookupResult::Unknown => GLOBAL_SCOPE_SENTINEL,
             };
 
-            let sl = RawSourceLocation {
+            let sl = raw::OriginalSourceLocation {
                 file_idx,
                 line,
                 scope_idx,
@@ -145,53 +133,83 @@ impl SmCache {
         }
 
         Ok(Self {
-            files,
-            scopes,
-            ranges,
+            string_bytes,
+            mappings: ranges,
         })
     }
 
-    /// Looks up a [`SourcePosition`] in the minified source and resolves it
-    /// to the original [`SourceLocation`].
-    pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
-        let range_idx = match self.ranges.binary_search_by_key(&sp, |r| r.0) {
-            Ok(idx) => idx,
-            Err(0) => 0,
-            Err(idx) => idx - 1,
-        };
+    /// Insert a string into this converter.
+    ///
+    /// If the string was already present, it is not added again. A newly added string
+    /// is prefixed by its length in LEB128 encoding. The returned `u32`
+    /// is the offset into the `string_bytes` field where the string is saved.
+    fn insert_string(
+        string_bytes: &mut Vec<u8>,
+        strings: &mut HashMap<String, u32>,
+        s: &str,
+    ) -> u32 {
+        if s.is_empty() {
+            return u32::MAX;
+        }
+        if let Some(&offset) = strings.get(s) {
+            return offset;
+        }
+        let string_offset = string_bytes.len() as u32;
+        let string_len = s.len() as u64;
+        leb128::write::unsigned(string_bytes, string_len).unwrap();
+        string_bytes.extend(s.bytes());
 
-        let range = self.ranges.get(range_idx)?;
-
-        let file = self
-            .files
-            .get_index(range.1.file_idx as usize)
-            .map(|s| s.as_str());
-        let line = range.1.line;
-        let scope = self.resolve_scope(range.1.scope_idx);
-        Some(SourceLocation { file, line, scope })
+        strings.insert(s.to_owned(), string_offset);
+        string_offset
     }
 
-    fn resolve_scope(&self, scope_idx: u32) -> ScopeLookupResult {
-        if scope_idx == GLOBAL_SCOPE_SENTINEL {
-            ScopeLookupResult::Unknown
-        } else if scope_idx == ANONYMOUS_SCOPE_SENTINEL {
-            ScopeLookupResult::AnonymousScope
-        } else {
-            match self.scopes.get_index(scope_idx as usize) {
-                Some(name) => ScopeLookupResult::NamedScope(name.as_str()),
-                None => ScopeLookupResult::Unknown,
-            }
+    /// Serialize the converted data.
+    ///
+    /// This writes the SmCache binary format into the given [`Write`].
+    pub fn serialize<W: Write>(self, writer: &mut W) -> std::io::Result<()> {
+        let mut writer = WriteWrapper::new(writer);
+
+        let num_mappings = self.mappings.len() as u32;
+        let string_bytes = self.string_bytes.len() as u32;
+
+        let header = raw::Header {
+            magic: raw::SMCACHE_MAGIC,
+            version: raw::SMCACHE_VERSION,
+            num_mappings,
+            string_bytes,
+            _reserved: [0; 16],
+        };
+
+        writer.write(header.as_bytes())?;
+        writer.align()?;
+
+        for (sp, _) in &self.mappings {
+            let sp = raw::MinifiedSourcePosition {
+                line: sp.line,
+                column: sp.column,
+            };
+            writer.write(sp.as_bytes())?;
         }
+        writer.align()?;
+
+        for (_, orig_sl) in self.mappings {
+            writer.write(orig_sl.as_bytes())?;
+        }
+        writer.align()?;
+
+        writer.write(&self.string_bytes)?;
+
+        Ok(())
     }
 }
 
 /// An Error that can happen when building a [`SmCache`].
 #[derive(Debug)]
-pub struct SmCacheError(SmCacheErrorInner);
+pub struct SmCacheWriterError(SmCacheErrorInner);
 
-impl From<SmCacheErrorInner> for SmCacheError {
+impl From<SmCacheErrorInner> for SmCacheWriterError {
     fn from(inner: SmCacheErrorInner) -> Self {
-        SmCacheError(inner)
+        SmCacheWriterError(inner)
     }
 }
 
@@ -202,14 +220,41 @@ enum SmCacheErrorInner {
     SourceContext(SourceContextError),
 }
 
-impl std::error::Error for SmCacheError {}
+impl std::error::Error for SmCacheWriterError {}
 
-impl std::fmt::Display for SmCacheError {
+impl std::fmt::Display for SmCacheWriterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
             SmCacheErrorInner::SourceMap(e) => e.fmt(f),
             SmCacheErrorInner::ScopeIndex(e) => e.fmt(f),
             SmCacheErrorInner::SourceContext(e) => e.fmt(f),
         }
+    }
+}
+
+struct WriteWrapper<W> {
+    writer: W,
+    position: usize,
+}
+
+impl<W: Write> WriteWrapper<W> {
+    fn new(writer: W) -> Self {
+        Self {
+            writer,
+            position: 0,
+        }
+    }
+
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        let len = data.len();
+        self.writer.write_all(data)?;
+        self.position += len;
+        Ok(len)
+    }
+
+    fn align(&mut self) -> std::io::Result<usize> {
+        let buf = &[0u8; 7];
+        let len = raw::align_to_eight(self.position);
+        self.write(&buf[0..len])
     }
 }
