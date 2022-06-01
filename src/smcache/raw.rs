@@ -1,3 +1,5 @@
+use zerocopy::{AsBytes, FromBytes};
+
 /// The magic file preamble as individual bytes.
 const SMCACHE_MAGIC_BYTES: [u8; 4] = *b"SMCA";
 
@@ -12,7 +14,7 @@ pub const SMCACHE_MAGIC_FLIPPED: u32 = SMCACHE_MAGIC.swap_bytes();
 pub const SMCACHE_VERSION: u32 = 1;
 
 /// The SmCache binary Header.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct Header {
     /// The file magic representing the file format and endianness.
@@ -28,11 +30,11 @@ pub struct Header {
 
     /// Some reserved space in the header for future extensions that would not require a
     /// completely new parsing method.
-    pub _reserved: [u8; 12],
+    pub _reserved: [u8; 16],
 }
 
 /// A lookup minified source position of line/column.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct SourcePosition {
     pub line: u32,
@@ -54,7 +56,7 @@ impl From<crate::source::SourcePosition> for SourcePosition {
 /// It looks a bit like this:
 /// 0xxxxxxx xxxxxxxx xxxxxxxy yyyyyyyy yyyyyyyy yyyzzzzz zzzzzzzz zzzzzzzz
 /// |^--- file_idx ---------^^------ line ---------^^------ scope_idx ----^
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct CompressedSourceLocation(u64);
 
@@ -117,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_sizeof() {
-        assert_eq!(mem::size_of::<Header>(), 28);
+        assert_eq!(mem::size_of::<Header>(), 32);
         assert_eq!(mem::align_of::<Header>(), 4);
 
         assert_eq!(mem::size_of::<SourcePosition>(), 8);

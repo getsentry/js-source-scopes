@@ -174,22 +174,19 @@ impl SmCacheWriter {
         let header = raw::Header {
             magic: raw::SMCACHE_MAGIC,
             version: raw::SMCACHE_VERSION,
-
             num_ranges,
             string_bytes,
-
-            _reserved: [0; 12],
+            _reserved: [0; 16],
         };
 
         writer.write(&[header])?;
         writer.align()?;
 
         for (sp, _) in &self.ranges {
-            let sp = raw::SourcePosition {
+            writer.write(&[raw::SourcePosition {
                 line: sp.line,
                 column: sp.column,
-            };
-            writer.write(&[sp])?;
+            }])?;
         }
         writer.align()?;
 
