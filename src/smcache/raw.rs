@@ -58,7 +58,7 @@ pub const GLOBAL_SCOPE_SENTINEL: u32 = u32::MAX;
 pub const ANONYMOUS_SCOPE_SENTINEL: u32 = u32::MAX - 1;
 
 /// The original source location, file line and scope.
-#[derive(Clone, Copy, Debug, PartialEq, FromBytes)]
+#[derive(Clone, Copy, Debug, PartialEq, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct OriginalSourceLocation {
     pub file_idx: u32,

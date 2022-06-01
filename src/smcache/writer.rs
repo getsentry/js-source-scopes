@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use sourcemap::DecodedMap;
+use zerocopy::AsBytes;
 
 use crate::source::{SourceContext, SourceContextError};
 use crate::{
@@ -17,7 +18,7 @@ use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
 pub struct SmCacheWriter {
     string_bytes: Vec<u8>,
 
-    ranges: Vec<(SourcePosition, raw::OriginalSourceLocation)>,
+    mappings: Vec<(SourcePosition, raw::OriginalSourceLocation)>,
 }
 
 impl SmCacheWriter {
@@ -133,7 +134,7 @@ impl SmCacheWriter {
 
         Ok(Self {
             string_bytes,
-            ranges,
+            mappings: ranges,
         })
     }
 
@@ -168,31 +169,31 @@ impl SmCacheWriter {
     pub fn serialize<W: Write>(self, writer: &mut W) -> std::io::Result<()> {
         let mut writer = WriteWrapper::new(writer);
 
-        let num_ranges = self.ranges.len() as u32;
+        let num_mappings = self.mappings.len() as u32;
         let string_bytes = self.string_bytes.len() as u32;
 
         let header = raw::Header {
             magic: raw::SMCACHE_MAGIC,
             version: raw::SMCACHE_VERSION,
-            num_mappings: num_ranges,
+            num_mappings,
             string_bytes,
             _reserved: [0; 16],
         };
 
-        writer.write(&[header])?;
+        writer.write(header.as_bytes())?;
         writer.align()?;
 
-        for (sp, _) in &self.ranges {
+        for (sp, _) in &self.mappings {
             let sp = raw::MinifiedSourcePosition {
                 line: sp.line,
                 column: sp.column,
             };
-            writer.write(&[sp])?;
+            writer.write(sp.as_bytes())?;
         }
         writer.align()?;
 
-        for (_, orig_sl) in self.ranges {
-            writer.write(&[orig_sl])?;
+        for (_, orig_sl) in self.mappings {
+            writer.write(orig_sl.as_bytes())?;
         }
         writer.align()?;
 
@@ -244,12 +245,9 @@ impl<W: Write> WriteWrapper<W> {
         }
     }
 
-    fn write<T>(&mut self, data: &[T]) -> std::io::Result<usize> {
-        let pointer = data.as_ptr() as *const u8;
-        let len = std::mem::size_of_val(data);
-        // SAFETY: both pointer and len are derived directly from data/T and are valid.
-        let buf = unsafe { std::slice::from_raw_parts(pointer, len) };
-        self.writer.write_all(buf)?;
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        let len = data.len();
+        self.writer.write_all(data)?;
         self.position += len;
         Ok(len)
     }
