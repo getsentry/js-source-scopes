@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 
 use sourcemap::DecodedMap;
@@ -139,6 +139,19 @@ impl SmCacheWriter {
         // TODO: iterate over all the `sourcesContent` files embedded in the
         // source map, and generate file entries for those, with line offsets,
         // similar to how `SourceContext` works.
+
+        let mut files = BTreeMap::new();
+        let orig_files = match &sm {
+            DecodedMap::Regular(sm) => sm.sources().zip(sm.source_contents()),
+            DecodedMap::Hermes(smh) => smh.sources().zip(smh.source_contents()),
+            DecodedMap::Index(_smi) => unreachable!(),
+        };
+
+        for (filename, contents) in orig_files {
+            // TODO
+            files.insert(filename.to_owned(), contents.to_owned());
+        }
+        dbg!(files);
 
         Ok(Self {
             string_bytes,
