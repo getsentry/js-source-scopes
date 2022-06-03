@@ -75,6 +75,25 @@ pub struct OriginalSourceLocation {
     pub scope_idx: u32,
 }
 
+/// A minified source position of line/column.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromBytes, AsBytes)]
+#[repr(C)]
+pub struct File {
+    /// The source filename (offset into string table).
+    pub name_offset: u32,
+    /// The file contents (offset into string table).
+    pub source_offset: u32,
+    /// Start of the line offsets (index into line offsets table).
+    pub line_offsets_start: u32,
+    /// End of the line offsets (index into line offsets table).
+    pub line_offsets_end: u32,
+}
+
+/// An offset into each files content representing line boundaries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromBytes, AsBytes)]
+#[repr(C)]
+pub struct LineOffset(pub u32);
+
 /// Returns the amount left to add to the remainder to get 8 if
 /// `to_align` isn't a multiple of 8.
 pub fn align_to_eight(to_align: usize) -> usize {
