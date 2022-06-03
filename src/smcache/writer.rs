@@ -136,6 +136,10 @@ impl SmCacheWriter {
             last = Some(sl);
         }
 
+        // TODO: iterate over all the `sourcesContent` files embedded in the
+        // source map, and generate file entries for those, with line offsets,
+        // similar to how `SourceContext` works.
+
         Ok(Self {
             string_bytes,
             mappings,
@@ -180,8 +184,10 @@ impl SmCacheWriter {
             magic: raw::SMCACHE_MAGIC,
             version: raw::SMCACHE_VERSION,
             num_mappings,
+            num_files: 0,
+            num_line_offsets: 0,
             string_bytes,
-            _reserved: [0; 16],
+            _reserved: [0; 8],
         };
 
         writer.write(header.as_bytes())?;

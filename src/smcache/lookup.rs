@@ -100,6 +100,10 @@ impl<'data> SmCache<'data> {
 
         Some(SourceLocation { file, line, scope })
     }
+
+    // TODO:
+    // pub fn get_file(&self, name: &str) -> Option<File>
+    // pub fn File::get_line(&self, line_no: u32/usize) -> Option<&'str>
 }
 
 #[derive(Debug)]

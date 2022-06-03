@@ -25,12 +25,18 @@ pub struct Header {
     /// The number of mappings covered by this file.
     pub num_mappings: u32,
 
+    /// The number of original source files.
+    pub num_files: u32,
+
+    /// The total number of line offsets.
+    pub num_line_offsets: u32,
+
     /// The total number of bytes in the string table.
     pub string_bytes: u32,
 
     /// Some reserved space in the header for future extensions that would not require a
     /// completely new parsing method.
-    pub _reserved: [u8; 16],
+    pub _reserved: [u8; 8],
 }
 
 /// A minified source position of line/column.
@@ -61,8 +67,11 @@ pub const ANONYMOUS_SCOPE_SENTINEL: u32 = u32::MAX - 1;
 #[derive(Clone, Copy, Debug, PartialEq, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct OriginalSourceLocation {
+    /// The optional original source filename (offset into string table).
     pub file_idx: u32,
+    /// The original line number.
     pub line: u32,
+    /// The optional scope name (offset into string table).
     pub scope_idx: u32,
 }
 
