@@ -8,11 +8,49 @@ use super::raw;
 #[derive(Debug, PartialEq)]
 pub struct SourceLocation<'data> {
     /// The source file this location belongs to.
-    pub file: Option<&'data str>,
+    file: Option<File<'data>>,
     /// The source line.
-    pub line: u32,
+    line: u32,
     /// The scope containing this source location.
-    pub scope: ScopeLookupResult<'data>,
+    scope: ScopeLookupResult<'data>,
+}
+
+impl<'data> SourceLocation<'data> {
+    /// The source file this location belongs to.
+    pub fn file(&self) -> Option<File<'data>> {
+        self.file
+    }
+
+    /// The source line.
+    pub fn line(&self) -> u32 {
+        self.line
+    }
+
+    /// The scope containing this source location.
+    pub fn scope(&self) -> ScopeLookupResult<'data> {
+        self.scope
+    }
+
+    /// The name of the source file this location belongs to.
+    ///
+    /// This is short for `self.file.as_ref().map(|file| file.name())`.
+    pub fn file_name(&self) -> Option<&'data str> {
+        self.file.as_ref().map(|file| file.name)
+    }
+
+    /// The source of the file this location belongs to.
+    ///
+    /// This is short for `self.file.as_ref().map(|file| file.source())`.
+    pub fn file_source(&self) -> Option<&'data str> {
+        self.file.as_ref().map(|file| file.source)
+    }
+
+    /// Returns the requested source line, if possible.
+    ///
+    /// This is short for `self.file.as_ref().and_then(|file| file.line(line_no))`.
+    pub fn source_line(&self, line_no: usize) -> Option<&'data str> {
+        self.file.as_ref().and_then(|file| file.line(line_no))
+    }
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -111,8 +149,20 @@ impl<'data> SmCache<'data> {
 
         let sl = self.orig_source_locations.get(idx)?;
 
-        let file = self.get_string(sl.file_idx);
         let line = sl.line;
+
+        let file = self.files.get(sl.file_idx as usize).and_then(|raw_file| {
+            let name = self.get_string(raw_file.name_offset)?;
+            let source = self.get_string(raw_file.source_offset)?;
+            let line_offsets = self
+                .line_offsets
+                .get(raw_file.line_offsets_start as usize..raw_file.line_offsets_end as usize)?;
+            Some(File {
+                name,
+                source,
+                line_offsets,
+            })
+        });
 
         let scope = match sl.scope_idx {
             raw::GLOBAL_SCOPE_SENTINEL => ScopeLookupResult::Unknown,
@@ -123,30 +173,6 @@ impl<'data> SmCache<'data> {
         };
 
         Some(SourceLocation { file, line, scope })
-    }
-
-    /// Returns the [`File`] which allows fast access to source lines.
-    pub fn get_file(&self, name: &str) -> Option<File> {
-        let file_idx = self
-            .files
-            .binary_search_by_key(&name, |file| {
-                // TODO: decoding the string here might be expensive.
-                // however, doing that ahead of time when loading the file is
-                // expensive too, so this is a tradeoff we could potentially measure.
-                self.get_string(file.name_offset).unwrap_or("")
-            })
-            .ok()?;
-        let file = self.files.get(file_idx)?;
-
-        let source = self.get_string(file.source_offset)?;
-        let line_offsets = self
-            .line_offsets
-            .get(file.line_offsets_start as usize..file.line_offsets_end as usize)?;
-
-        Some(File {
-            source,
-            line_offsets,
-        })
     }
 }
 
@@ -168,19 +194,26 @@ pub enum Error {
     StringBytes,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct File<'data> {
+    name: &'data str,
     source: &'data str,
     line_offsets: &'data [raw::LineOffset],
 }
 
 impl<'data> File<'data> {
+    /// Returns the name of this file.
+    pub fn name(&self) -> &'data str {
+        self.name
+    }
+
     /// Returns the source of this file.
-    pub fn get_source(&self) -> &str {
+    pub fn source(&self) -> &'data str {
         self.source
     }
 
     /// Returns the requested source line if possible.
-    pub fn get_line(&self, line_no: usize) -> Option<&str> {
+    pub fn line(&self, line_no: usize) -> Option<&'data str> {
         let from = self.line_offsets.get(line_no).copied()?.0 as usize;
         let to = self.line_offsets.get(line_no.checked_add(1)?).copied()?.0 as usize;
         self.source.get(from..to)
