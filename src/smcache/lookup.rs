@@ -2,7 +2,7 @@ use zerocopy::LayoutVerified;
 
 use crate::{ScopeLookupResult, SourcePosition};
 
-use super::raw::{self, LineOffset};
+use super::raw;
 
 /// A resolved Source Location  with file, line and scope information.
 #[derive(Debug, PartialEq)]
@@ -170,7 +170,7 @@ pub enum Error {
 
 pub struct File<'data> {
     source: &'data str,
-    line_offsets: &'data [LineOffset],
+    line_offsets: &'data [raw::LineOffset],
 }
 
 impl<'data> File<'data> {
