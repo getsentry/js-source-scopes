@@ -15,7 +15,8 @@ use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
 /// to the original [`raw::OriginalSourceLocation`] it maps to.
 pub struct SmCacheWriter {
     string_bytes: Vec<u8>,
-
+    files: Vec<raw::File>,
+    line_offsets: Vec<raw::LineOffset>,
     mappings: Vec<(raw::MinifiedSourcePosition, raw::OriginalSourceLocation)>,
 }
 
@@ -136,12 +137,43 @@ impl SmCacheWriter {
             last = Some(sl);
         }
 
-        // TODO: iterate over all the `sourcesContent` files embedded in the
-        // source map, and generate file entries for those, with line offsets,
-        // similar to how `SourceContext` works.
+        let orig_files = match &sm {
+            DecodedMap::Regular(sm) => sm.sources().zip(sm.source_contents()),
+            DecodedMap::Hermes(smh) => smh.sources().zip(smh.source_contents()),
+            DecodedMap::Index(_smi) => unreachable!(),
+        }
+        .filter_map(|(name, source)| source.map(|source| (name, source)));
+
+        let mut line_offsets = vec![];
+        let mut files = vec![];
+        for (name, source) in orig_files {
+            let name_offset = Self::insert_string(&mut string_bytes, &mut strings, name);
+            let source_offset = Self::insert_string(&mut string_bytes, &mut strings, source);
+            let line_offsets_start = line_offsets.len() as u32;
+            let buf_ptr = source.as_ptr();
+            line_offsets.extend(source.lines().map(|line| {
+                raw::LineOffset(unsafe { line.as_ptr().offset_from(buf_ptr) as usize } as u32)
+            }));
+            line_offsets.push(raw::LineOffset(source.len() as u32));
+            let line_offsets_end = line_offsets.len() as u32;
+
+            files.push((
+                name,
+                raw::File {
+                    name_offset,
+                    source_offset,
+                    line_offsets_start,
+                    line_offsets_end,
+                },
+            ));
+        }
+        files.sort_by_key(|(name, _file)| *name);
+        let files = files.into_iter().map(|(_name, file)| file).collect();
 
         Ok(Self {
             string_bytes,
+            files,
+            line_offsets,
             mappings,
         })
     }
@@ -177,16 +209,13 @@ impl SmCacheWriter {
     pub fn serialize<W: Write>(self, writer: &mut W) -> std::io::Result<()> {
         let mut writer = WriteWrapper::new(writer);
 
-        let num_mappings = self.mappings.len() as u32;
-        let string_bytes = self.string_bytes.len() as u32;
-
         let header = raw::Header {
             magic: raw::SMCACHE_MAGIC,
             version: raw::SMCACHE_VERSION,
-            num_mappings,
-            num_files: 0,
-            num_line_offsets: 0,
-            string_bytes,
+            num_mappings: self.mappings.len() as u32,
+            num_files: self.files.len() as u32,
+            num_line_offsets: self.line_offsets.len() as u32,
+            string_bytes: self.string_bytes.len() as u32,
             _reserved: [0; 8],
         };
 
@@ -201,6 +230,12 @@ impl SmCacheWriter {
         for (_, orig_sl) in self.mappings {
             writer.write(orig_sl.as_bytes())?;
         }
+        writer.align()?;
+
+        writer.write(self.files.as_bytes())?;
+        writer.align()?;
+
+        writer.write(self.line_offsets.as_bytes())?;
         writer.align()?;
 
         writer.write(&self.string_bytes)?;

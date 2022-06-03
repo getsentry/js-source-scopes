@@ -1,6 +1,7 @@
 use js_source_scopes::{
     extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
 };
+use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
 
 #[test]
 fn resolves_scope_names() {
@@ -158,8 +159,6 @@ fn resolves_token_from_names() {
 
 #[test]
 fn writes_simple_cache() {
-    use js_source_scopes::{SmCache, SmCacheWriter};
-
     let minified = std::fs::read_to_string("tests/fixtures/simple/minified.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/simple/minified.js.map").unwrap();
 
@@ -168,16 +167,28 @@ fn writes_simple_cache() {
     let mut buf = vec![];
     writer.serialize(&mut buf).unwrap();
 
-    dbg!(&buf);
-
     let cache = SmCache::parse(&buf).unwrap();
-    dbg!(cache);
+
+    let sl = cache.lookup(SourcePosition::new(0, 10)).unwrap();
+
+    assert_eq!(
+        sl,
+        SourceLocation {
+            file: Some("tests/fixtures/simple/original.js"),
+            line: 1,
+            scope: ScopeLookupResult::NamedScope("abcd"),
+        }
+    );
+
+    let file = cache.get_file(sl.file.unwrap()).unwrap();
+
+    let source_line = file.get_line(sl.line as usize).unwrap();
+
+    assert_eq!(source_line, "function abcd() {}\n");
 }
 
 #[test]
 fn resolves_location_from_cache() {
-    use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
-
     let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
 
