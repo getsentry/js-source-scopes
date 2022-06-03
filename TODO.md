@@ -1,5 +1,10 @@
 # TODO
 
+## Internals
+
+- should we rather use usize for internals that are not written to disk?
+- ^ similarly, should we use more strict types rather than sentinel values?
+
 ## SmCache
 
 - find a better name ;-)

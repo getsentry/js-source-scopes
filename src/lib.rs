@@ -2,22 +2,22 @@
 
 use std::ops::Range;
 
-mod lookup;
+mod name_resolver;
 mod rslint;
+mod scope_index;
 mod scope_name;
 mod smcache;
 mod source;
-mod sourcemap;
 
-pub use crate::sourcemap::NameResolver;
-pub use lookup::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
+pub use name_resolver::NameResolver;
+pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
 pub use smcache::{SmCache, SmCacheWriter, SmCacheWriterError, SourceLocation};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.
 ///
-/// The returned Vec includes the `Range` of the function scope, in byte offsets
+/// The returned Vec includes the [`Range`] of the function scope, in byte offsets
 /// inside the `src`, and the corresponding function name. `None` in this case
 /// denotes a function scope for which no name could be inferred from the
 /// surrounding code, which can mostly happen for anonymous or arrow functions

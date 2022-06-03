@@ -4,21 +4,19 @@ use std::io::Write;
 use sourcemap::DecodedMap;
 use zerocopy::AsBytes;
 
+use crate::scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 use crate::source::{SourceContext, SourceContextError};
-use crate::{
-    extract_scope_names, NameResolver, ScopeIndex, ScopeIndexError, ScopeLookupResult,
-    SourcePosition,
-};
+use crate::{extract_scope_names, NameResolver, SourcePosition};
 
 use super::raw;
 use raw::{ANONYMOUS_SCOPE_SENTINEL, GLOBAL_SCOPE_SENTINEL, NO_FILE_SENTINEL};
 
-/// A structure that allows quick resolution of minified [`raw::SourcePosition`]s
-/// to the original [`raw::SourceLocation`] it maps to.
+/// A structure that allows quick resolution of minified [`raw::MinifiedSourcePosition`]s
+/// to the original [`raw::OriginalSourceLocation`] it maps to.
 pub struct SmCacheWriter {
     string_bytes: Vec<u8>,
 
-    mappings: Vec<(SourcePosition, raw::OriginalSourceLocation)>,
+    mappings: Vec<(raw::MinifiedSourcePosition, raw::OriginalSourceLocation)>,
 }
 
 impl SmCacheWriter {
@@ -92,7 +90,7 @@ impl SmCacheWriter {
         // iterate over the tokens and create our index
         let mut string_bytes = Vec::new();
         let mut strings = HashMap::new();
-        let mut ranges = Vec::new();
+        let mut mappings = Vec::new();
 
         let mut last = None;
         for token in tokens {
@@ -128,13 +126,19 @@ impl SmCacheWriter {
             if last == Some(sl) {
                 continue;
             }
-            ranges.push((sp, sl));
+            mappings.push((
+                raw::MinifiedSourcePosition {
+                    line: sp.line,
+                    column: sp.column,
+                },
+                sl,
+            ));
             last = Some(sl);
         }
 
         Ok(Self {
             string_bytes,
-            mappings: ranges,
+            mappings,
         })
     }
 
@@ -183,12 +187,8 @@ impl SmCacheWriter {
         writer.write(header.as_bytes())?;
         writer.align()?;
 
-        for (sp, _) in &self.mappings {
-            let sp = raw::MinifiedSourcePosition {
-                line: sp.line,
-                column: sp.column,
-            };
-            writer.write(sp.as_bytes())?;
+        for (min_sp, _) in &self.mappings {
+            writer.write(min_sp.as_bytes())?;
         }
         writer.align()?;
 
