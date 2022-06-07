@@ -44,6 +44,7 @@ impl<'data> SourceLocation<'data> {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[derive(Clone)]
 pub struct SmCache<'data> {
     header: &'data raw::Header,
     min_source_positions: &'data [raw::MinifiedSourcePosition],
@@ -127,6 +128,19 @@ impl<'data> SmCache<'data> {
         std::str::from_utf8(bytes).ok()
     }
 
+    fn resolve_file(&self, raw_file: &raw::File) -> Option<File<'data>> {
+        let name = self.get_string(raw_file.name_offset)?;
+        let source = self.get_string(raw_file.source_offset)?;
+        let line_offsets = self
+            .line_offsets
+            .get(raw_file.line_offsets_start as usize..raw_file.line_offsets_end as usize)?;
+        Some(File {
+            name,
+            source,
+            line_offsets,
+        })
+    }
+
     /// Looks up a [`SourcePosition`] in the minified source and resolves it
     /// to the original [`SourceLocation`].
     pub fn lookup(&self, sp: SourcePosition) -> Option<SourceLocation> {
@@ -140,18 +154,10 @@ impl<'data> SmCache<'data> {
 
         let line = sl.line;
 
-        let file = self.files.get(sl.file_idx as usize).and_then(|raw_file| {
-            let name = self.get_string(raw_file.name_offset)?;
-            let source = self.get_string(raw_file.source_offset)?;
-            let line_offsets = self
-                .line_offsets
-                .get(raw_file.line_offsets_start as usize..raw_file.line_offsets_end as usize)?;
-            Some(File {
-                name,
-                source,
-                line_offsets,
-            })
-        });
+        let file = self
+            .files
+            .get(sl.file_idx as usize)
+            .and_then(|raw_file| self.resolve_file(raw_file));
 
         let scope = match sl.scope_idx {
             raw::GLOBAL_SCOPE_SENTINEL => ScopeLookupResult::Unknown,
@@ -162,6 +168,9 @@ impl<'data> SmCache<'data> {
         };
 
         Some(SourceLocation { file, line, scope })
+    /// Returns an iterator over all files in the cache.
+    pub fn files(&self) -> Files<'data> {
+        Files::new(self)
     }
 }
 
@@ -206,6 +215,31 @@ impl<'data> File<'data> {
         let from = self.line_offsets.get(line_no).copied()?.0 as usize;
         let to = self.line_offsets.get(line_no.checked_add(1)?).copied()?.0 as usize;
         self.source.get(from..to)
+    }
+}
+
+/// Iterator returned by [`SmCache::files`].
+pub struct Files<'data> {
+    cache: SmCache<'data>,
+    raw_files: std::slice::Iter<'data, raw::File>,
+}
+
+impl<'data> Files<'data> {
+    fn new(cache: &SmCache<'data>) -> Self {
+        Self {
+            cache: cache.clone(),
+            raw_files: cache.files.iter(),
+        }
+    }
+}
+
+impl<'data> Iterator for Files<'data> {
+    type Item = File<'data>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.raw_files
+            .next()
+            .and_then(|raw_file| self.cache.resolve_file(raw_file))
     }
 }
 
