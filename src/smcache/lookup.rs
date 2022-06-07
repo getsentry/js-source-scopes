@@ -33,12 +33,12 @@ impl<'data> SourceLocation<'data> {
 
     /// The name of the source file this location belongs to.
     pub fn file_name(&self) -> Option<&'data str> {
-        self.file.as_ref().map(|file| file.name)
+        self.file.map(|file| file.name)
     }
 
     /// The source of the file this location belongs to.
     pub fn file_source(&self) -> Option<&'data str> {
-        self.file.as_ref().map(|file| file.source)
+        self.file.map(|file| file.source)
     }
 }
 
