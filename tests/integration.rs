@@ -1,7 +1,7 @@
 use js_source_scopes::{
     extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
 };
-use js_source_scopes::{SmCache, SmCacheWriter, SourceLocation};
+use js_source_scopes::{SmCache, SmCacheWriter};
 
 #[test]
 fn resolves_scope_names() {
@@ -171,20 +171,10 @@ fn writes_simple_cache() {
 
     let sl = cache.lookup(SourcePosition::new(0, 10)).unwrap();
 
-    assert_eq!(
-        sl,
-        SourceLocation {
-            file: Some("tests/fixtures/simple/original.js"),
-            line: 1,
-            scope: ScopeLookupResult::NamedScope("abcd"),
-        }
-    );
-
-    let file = cache.get_file(sl.file.unwrap()).unwrap();
-
-    let source_line = file.get_line(sl.line as usize).unwrap();
-
-    assert_eq!(source_line, "function abcd() {}\n");
+    assert_eq!(sl.file_name(), Some("tests/fixtures/simple/original.js"));
+    assert_eq!(sl.line(), 1);
+    assert_eq!(sl.scope(), ScopeLookupResult::NamedScope("abcd"));
+    assert_eq!(sl.line_contents().unwrap(), "function abcd() {}\n");
 }
 
 #[test]
@@ -206,48 +196,28 @@ fn resolves_location_from_cache() {
         cache.lookup(SourcePosition::new(l - 1, c - 1))
     };
 
-    assert_eq!(
-        lookup(1, 50),
-        Some(SourceLocation {
-            file: Some("../src/constants.js"),
-            line: 2,
-            scope: Unknown,
-        })
-    );
+    let sl = lookup(1, 50).unwrap();
+    assert_eq!(sl.file_name(), Some("../src/constants.js"));
+    assert_eq!(sl.line(), 2);
+    assert_eq!(sl.scope(), Unknown);
 
-    assert_eq!(
-        lookup(1, 133),
-        Some(SourceLocation {
-            file: Some("../src/util.js"),
-            line: 11,
-            scope: NamedScope("assign")
-        })
-    );
+    let sl = lookup(1, 133).unwrap();
+    assert_eq!(sl.file_name(), Some("../src/util.js"));
+    assert_eq!(sl.line(), 11);
+    assert_eq!(sl.scope(), NamedScope("assign"));
 
-    assert_eq!(
-        lookup(1, 482),
-        Some(SourceLocation {
-            file: Some("../src/create-element.js"),
-            line: 39,
-            scope: NamedScope("createElement")
-        })
-    );
+    let sl = lookup(1, 482).unwrap();
+    assert_eq!(sl.file_name(), Some("../src/create-element.js"));
+    assert_eq!(sl.line(), 39);
+    assert_eq!(sl.scope(), NamedScope("createElement"));
 
-    assert_eq!(
-        lookup(1, 9780),
-        Some(SourceLocation {
-            file: Some("../src/component.js"),
-            line: 181,
-            scope: Unknown
-        })
-    );
+    let sl = lookup(1, 9780).unwrap();
+    assert_eq!(sl.file_name(), Some("../src/component.js"));
+    assert_eq!(sl.line(), 181);
+    assert_eq!(sl.scope(), Unknown);
 
-    assert_eq!(
-        lookup(1, 9795),
-        Some(SourceLocation {
-            file: Some("../src/create-context.js"),
-            line: 2,
-            scope: Unknown
-        })
-    );
+    let sl = lookup(1, 9795).unwrap();
+    assert_eq!(sl.file_name(), Some("../src/create-context.js"));
+    assert_eq!(sl.line(), 2);
+    assert_eq!(sl.scope(), Unknown);
 }

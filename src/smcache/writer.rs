@@ -88,11 +88,43 @@ impl SmCacheWriter {
             }
         };
 
-        // iterate over the tokens and create our index
+        let orig_files = match &sm {
+            DecodedMap::Regular(sm) => sm.sources().zip(sm.source_contents()),
+            DecodedMap::Hermes(smh) => smh.sources().zip(smh.source_contents()),
+            DecodedMap::Index(_smi) => unreachable!(),
+        }
+        .filter_map(|(name, source)| source.map(|source| (name, source)));
+
         let mut string_bytes = Vec::new();
         let mut strings = HashMap::new();
         let mut mappings = Vec::new();
 
+        let mut line_offsets = vec![];
+        let mut files = vec![];
+        for (name, source) in orig_files {
+            let name_offset = Self::insert_string(&mut string_bytes, &mut strings, name);
+            let source_offset = Self::insert_string(&mut string_bytes, &mut strings, source);
+            let line_offsets_start = line_offsets.len() as u32;
+            let buf_ptr = source.as_ptr();
+            line_offsets.extend(source.lines().map(|line| {
+                raw::LineOffset(unsafe { line.as_ptr().offset_from(buf_ptr) as usize } as u32)
+            }));
+            line_offsets.push(raw::LineOffset(source.len() as u32));
+            let line_offsets_end = line_offsets.len() as u32;
+
+            files.push((
+                name,
+                raw::File {
+                    name_offset,
+                    source_offset,
+                    line_offsets_start,
+                    line_offsets_end,
+                },
+            ));
+        }
+        files.sort_by_key(|(name, _file)| *name);
+
+        // iterate over the tokens and create our index
         let mut last = None;
         for token in tokens {
             let (min_line, min_col) = token.get_dst();
@@ -102,10 +134,10 @@ impl SmCacheWriter {
             let scope = lookup_scope(&sp);
 
             let file_idx = match file {
-                Some(file) => std::cmp::min(
-                    Self::insert_string(&mut string_bytes, &mut strings, file),
-                    NO_FILE_SENTINEL,
-                ),
+                Some(file) => files
+                    .binary_search_by_key(&file, |(file_name, _)| file_name)
+                    .map(|idx| idx as u32)
+                    .unwrap_or(NO_FILE_SENTINEL),
                 None => NO_FILE_SENTINEL,
             };
 
@@ -137,37 +169,6 @@ impl SmCacheWriter {
             last = Some(sl);
         }
 
-        let orig_files = match &sm {
-            DecodedMap::Regular(sm) => sm.sources().zip(sm.source_contents()),
-            DecodedMap::Hermes(smh) => smh.sources().zip(smh.source_contents()),
-            DecodedMap::Index(_smi) => unreachable!(),
-        }
-        .filter_map(|(name, source)| source.map(|source| (name, source)));
-
-        let mut line_offsets = vec![];
-        let mut files = vec![];
-        for (name, source) in orig_files {
-            let name_offset = Self::insert_string(&mut string_bytes, &mut strings, name);
-            let source_offset = Self::insert_string(&mut string_bytes, &mut strings, source);
-            let line_offsets_start = line_offsets.len() as u32;
-            let buf_ptr = source.as_ptr();
-            line_offsets.extend(source.lines().map(|line| {
-                raw::LineOffset(unsafe { line.as_ptr().offset_from(buf_ptr) as usize } as u32)
-            }));
-            line_offsets.push(raw::LineOffset(source.len() as u32));
-            let line_offsets_end = line_offsets.len() as u32;
-
-            files.push((
-                name,
-                raw::File {
-                    name_offset,
-                    source_offset,
-                    line_offsets_start,
-                    line_offsets_end,
-                },
-            ));
-        }
-        files.sort_by_key(|(name, _file)| *name);
         let files = files.into_iter().map(|(_name, file)| file).collect();
 
         Ok(Self {

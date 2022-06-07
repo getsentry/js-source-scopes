@@ -67,7 +67,7 @@ pub const ANONYMOUS_SCOPE_SENTINEL: u32 = u32::MAX - 1;
 #[derive(Clone, Copy, Debug, PartialEq, FromBytes, AsBytes)]
 #[repr(C)]
 pub struct OriginalSourceLocation {
-    /// The optional original source filename (offset into string table).
+    /// The optional original source file (index in the file table).
     pub file_idx: u32,
     /// The original line number.
     pub line: u32,
