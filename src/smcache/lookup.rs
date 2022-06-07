@@ -21,9 +21,14 @@ impl<'data> SourceLocation<'data> {
         self.file
     }
 
-    /// The source line.
+    /// The number of the source line.
     pub fn line(&self) -> u32 {
         self.line
+    }
+
+    /// The contents of the source line.
+    pub fn line_contents(&self) -> Option<&'data str> {
+        self.file().and_then(|file| file.line(self.line as usize))
     }
 
     /// The scope containing this source location.
@@ -168,6 +173,8 @@ impl<'data> SmCache<'data> {
         };
 
         Some(SourceLocation { file, line, scope })
+    }
+
     /// Returns an iterator over all files in the cache.
     pub fn files(&self) -> Files<'data> {
         Files::new(self)

@@ -174,10 +174,7 @@ fn writes_simple_cache() {
     assert_eq!(sl.file_name(), Some("tests/fixtures/simple/original.js"));
     assert_eq!(sl.line(), 1);
     assert_eq!(sl.scope(), ScopeLookupResult::NamedScope("abcd"));
-    assert_eq!(
-        sl.source_line(sl.line() as usize).unwrap(),
-        "function abcd() {}\n"
-    );
+    assert_eq!(sl.line_contents().unwrap(), "function abcd() {}\n");
 }
 
 #[test]
