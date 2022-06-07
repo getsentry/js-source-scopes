@@ -44,13 +44,6 @@ impl<'data> SourceLocation<'data> {
     pub fn file_source(&self) -> Option<&'data str> {
         self.file.as_ref().map(|file| file.source)
     }
-
-    /// Returns the requested source line, if possible.
-    ///
-    /// This is short for `self.file.as_ref().and_then(|file| file.line(line_no))`.
-    pub fn source_line(&self, line_no: usize) -> Option<&'data str> {
-        self.file.as_ref().and_then(|file| file.line(line_no))
-    }
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
