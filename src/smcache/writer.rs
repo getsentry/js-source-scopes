@@ -93,7 +93,7 @@ impl SmCacheWriter {
             DecodedMap::Hermes(smh) => smh.sources().zip(smh.source_contents()),
             DecodedMap::Index(_smi) => unreachable!(),
         }
-        .filter_map(|(name, source)| source.map(|source| (name, source)));
+        .map(|(name, source)| (name, source.unwrap_or_default()));
 
         let mut string_bytes = Vec::new();
         let mut strings = HashMap::new();

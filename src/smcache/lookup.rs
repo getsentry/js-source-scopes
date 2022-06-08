@@ -43,7 +43,7 @@ impl<'data> SourceLocation<'data> {
 
     /// The source of the file this location belongs to.
     pub fn file_source(&self) -> Option<&'data str> {
-        self.file.map(|file| file.source)
+        self.file.and_then(|file| file.source)
     }
 }
 
@@ -135,7 +135,7 @@ impl<'data> SmCache<'data> {
 
     fn resolve_file(&self, raw_file: &raw::File) -> Option<File<'data>> {
         let name = self.get_string(raw_file.name_offset)?;
-        let source = self.get_string(raw_file.source_offset)?;
+        let source = self.get_string(raw_file.source_offset);
         let line_offsets = self
             .line_offsets
             .get(raw_file.line_offsets_start as usize..raw_file.line_offsets_end as usize)?;
@@ -202,7 +202,7 @@ pub enum Error {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct File<'data> {
     name: &'data str,
-    source: &'data str,
+    source: Option<&'data str>,
     line_offsets: &'data [raw::LineOffset],
 }
 
@@ -213,7 +213,7 @@ impl<'data> File<'data> {
     }
 
     /// Returns the source of this file.
-    pub fn source(&self) -> &'data str {
+    pub fn source(&self) -> Option<&'data str> {
         self.source
     }
 
@@ -221,7 +221,7 @@ impl<'data> File<'data> {
     pub fn line(&self, line_no: usize) -> Option<&'data str> {
         let from = self.line_offsets.get(line_no).copied()?.0 as usize;
         let to = self.line_offsets.get(line_no.checked_add(1)?).copied()?.0 as usize;
-        self.source.get(from..to)
+        self.source.and_then(|source| source.get(from..to))
     }
 }
 

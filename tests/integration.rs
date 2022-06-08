@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use js_source_scopes::{
     extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
 };
@@ -220,4 +222,40 @@ fn resolves_location_from_cache() {
     assert_eq!(sl.file_name(), Some("../src/create-context.js"));
     assert_eq!(sl.line(), 2);
     assert_eq!(sl.scope(), Unknown);
+}
+
+#[test]
+fn missing_source_contents() {
+    let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
+    let map =
+        std::fs::read_to_string("tests/fixtures/preact-missing-source-contents.module.js.map")
+            .unwrap();
+
+    let writer = SmCacheWriter::new(&minified, &map).unwrap();
+
+    let mut buf = vec![];
+    writer.serialize(&mut buf).unwrap();
+
+    let cache = SmCache::parse(&buf).unwrap();
+
+    let mut files: HashMap<_, _> = cache
+        .files()
+        .map(|file| (file.name(), file.source()))
+        .collect();
+
+    assert_eq!(files.len(), 12);
+
+    // The source map contains `null` for the sourceContents of `util.js` and `create-element.js` and is missing
+    // the sourceContents for `catch-error.js` entirely.
+    assert!(files.remove("../src/util.js").unwrap().is_none());
+    assert!(files.remove("../src/create-element.js").unwrap().is_none());
+    assert!(files
+        .remove("../src/diff/catch-error.js")
+        .unwrap()
+        .is_none());
+
+    // All other source contents should be there.
+    for contents in files.values() {
+        assert!(contents.is_some());
+    }
 }
