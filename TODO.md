@@ -8,15 +8,6 @@
 ## SmCache
 
 - find a better name ;-)
-- figure out if we need to save `sourcesContent` as well
-  - adapt the `SourceContext` type and persist that into the binary
-  - the raw contents can be appended to the string table
-  - the `line_offsets` can be persisted into another table and has offsets into the string table of each line start
-  - then we would need a third table for `files`, which consist of:
-    - name: offset into string table
-    - line_offsets_idx: index into the offsets table
-    - lines: number of line offsets this file has (minimum of 1 for zero-length file)
-  - the `files` table can be sorted by name to make lookup a bit faster
 
 # file UUIDs
 
