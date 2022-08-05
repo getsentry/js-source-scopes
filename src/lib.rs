@@ -12,7 +12,9 @@ mod source;
 pub use name_resolver::NameResolver;
 pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
-pub use smcache::{SmCache, SmCacheWriter, SmCacheWriterError, SourceLocation};
+pub use smcache::{
+    Error as SmCacheError, SmCache, SmCacheWriter, SmCacheWriterError, SourceLocation,
+};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.
