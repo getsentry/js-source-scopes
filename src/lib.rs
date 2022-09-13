@@ -6,15 +6,11 @@ mod name_resolver;
 mod rslint;
 mod scope_index;
 mod scope_name;
-mod smcache;
 mod source;
 
 pub use name_resolver::NameResolver;
 pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
-pub use smcache::{
-    Error as SmCacheError, SmCache, SmCacheWriter, SmCacheWriterError, SourceLocation,
-};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.
@@ -34,7 +30,7 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// # Examples
 ///
 /// ```
-/// use symbolic_sourcemapcache::_internal_not_stable_::extract_scope_names;
+/// use js_source_scopes::extract_scope_names;
 /// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
 /// //                arrowFnExpr -^------^  ^------namedFnDecl------^
 /// let mut scopes: Vec<_> = js_source_scopes::extract_scope_names(src)

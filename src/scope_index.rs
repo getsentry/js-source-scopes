@@ -13,7 +13,7 @@ use indexmap::IndexSet;
 /// # Examples
 ///
 /// ```
-/// use symbolic_sourcemapcache::_internal_not_stable_::{ScopeIndex, ScopeLookupResult};
+/// use js_source_scopes::{ScopeIndex, ScopeLookupResult};
 ///
 /// let scopes = vec![
 ///     (5..25, Some(String::from("parent"))),

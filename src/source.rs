@@ -9,7 +9,7 @@
 /// # Examples
 ///
 /// ```
-/// use symbolic_sourcemapcache::_internal_not_stable_::{SourceContext, SourcePosition};
+/// use js_source_scopes::{SourceContext, SourcePosition};
 ///
 /// let src = r#"const arrowFnExpr = (a) => a;
 /// function namedFnDecl() {}"#;
