@@ -34,6 +34,7 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// # Examples
 ///
 /// ```
+/// use symbolic_sourcemapcache::_internal_not_stable_::extract_scope_names;
 /// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
 /// //                arrowFnExpr -^------^  ^------namedFnDecl------^
 /// let mut scopes: Vec<_> = js_source_scopes::extract_scope_names(src)
@@ -52,6 +53,7 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// ];
 /// assert_eq!(scopes, expected);
 /// ```
+#[tracing::instrument(level = "trace", skip_all)]
 pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<ScopeName>)> {
     rslint::parse_with_rslint(src)
 }

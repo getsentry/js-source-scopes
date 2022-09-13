@@ -13,7 +13,7 @@ use indexmap::IndexSet;
 /// # Examples
 ///
 /// ```
-/// use js_source_scopes::{ScopeIndex, ScopeLookupResult};
+/// use symbolic_sourcemapcache::_internal_not_stable_::{ScopeIndex, ScopeLookupResult};
 ///
 /// let scopes = vec![
 ///     (5..25, Some(String::from("parent"))),
@@ -36,6 +36,7 @@ pub struct ScopeIndex {
 
 impl ScopeIndex {
     /// Creates a new Scope index from the given list of Scopes.
+    #[tracing::instrument(level = "trace", name = "ScopeIndex::new", skip_all)]
     pub fn new(mut scopes: Vec<(Range<u32>, Option<String>)>) -> Result<Self, ScopeIndexError> {
         let mut names = IndexSet::new();
         let mut ranges = vec![];
@@ -120,7 +121,7 @@ impl ScopeIndex {
 }
 
 /// The Result of a Scope lookup.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScopeLookupResult<'data> {
     /// A named function scope.
     NamedScope(&'data str),
