@@ -30,7 +30,6 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// # Examples
 ///
 /// ```
-/// use js_source_scopes::extract_scope_names;
 /// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
 /// //                arrowFnExpr -^------^  ^------namedFnDecl------^
 /// let mut scopes: Vec<_> = js_source_scopes::extract_scope_names(src)
