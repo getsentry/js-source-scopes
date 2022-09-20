@@ -6,15 +6,11 @@ mod name_resolver;
 mod rslint;
 mod scope_index;
 mod scope_name;
-mod smcache;
 mod source;
 
 pub use name_resolver::NameResolver;
 pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
-pub use smcache::{
-    Error as SmCacheError, SmCache, SmCacheWriter, SmCacheWriterError, SourceLocation,
-};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
 
 /// Extracts function scopes from the given JS-like `src`.
@@ -52,6 +48,7 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// ];
 /// assert_eq!(scopes, expected);
 /// ```
+#[tracing::instrument(level = "trace", skip_all)]
 pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<ScopeName>)> {
     rslint::parse_with_rslint(src)
 }
