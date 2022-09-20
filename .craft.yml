@@ -1,0 +1,6 @@
+changelogPolicy: auto
+artifactProvider:
+  name: none
+targets:
+  - name: crates
+  - name: github

@@ -3,6 +3,14 @@ name = "js-source-scopes"
 version = "0.1.0"
 edition = "2021"
 
+description = "Utilities for extracting and dealing with scope information in JS code"
+authors = ["Sentry <hello@sentry.io>"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/js-source-scopes"
+homepage = "https://github.com/getsentry/js-source-scopes"
+repository = "https://github.com/getsentry/js-source-scopes"
+
 [dependencies]
 #swc_ecma_parser = "0.103.0"
 indexmap = "1.7.0"

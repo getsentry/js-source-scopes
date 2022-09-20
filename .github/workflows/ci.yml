@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - "release/**"
+  pull_request:
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUSTDOCFLAGS: -Dwarnings
+
+jobs:
+  lints:
+    name: Style/Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --all -- --check
+
+      - run: cargo clippy --all-features --workspace --all-targets -- -D clippy::all
+
+  docs:
+    name: Rust Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal --component rust-docs
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo doc --workspace --all-features --no-deps
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    name: Rust Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo test --workspace --all-features --all-targets
+
+  codecov:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal --component llvm-tools-preview
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+      - uses: codecov/codecov-action@e156083f13aff6830c92fc5faa23505779fbf649
+        with:
+          files: lcov.info
