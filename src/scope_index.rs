@@ -2,10 +2,8 @@ use std::ops::Range;
 
 use indexmap::IndexSet;
 
-/// An indexed structure of Scopes that allows quick lookup.
+/// An indexed structure of scopes that allows quick lookup by byte offset.
 ///
-/// Primarily, it converts a list of possibly nested named scopes into an
-/// optimized structure that allows quick lookup.
 /// Construction of the index will validate that the scopes are well nested and
 /// parents fully contain their children. A list of scopes that are not well
 /// nested will result in an `Err` on construction.
@@ -114,7 +112,10 @@ impl ScopeIndex {
         }
     }
 
-    /// Iterates over all the offsets and scope names in order.
+    /// Returns an iterator over the scopes in this index and their starting
+    /// offsets.
+    ///
+    /// Scopes are returned in order of their starting offsets.
     pub fn iter(&self) -> impl Iterator<Item = (u32, ScopeLookupResult)> {
         self.ranges.iter().map(|r| (r.0, self.resolve_name(r.1)))
     }
