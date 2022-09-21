@@ -1,4 +1,4 @@
-/// A Source Context allowing fast line/column <-> byte offset remapping.
+/// A structure allowing fast line/column <-> byte offset remapping.
 ///
 /// The primary use-case is to allow efficient conversion between
 /// [`SourcePosition`]s (line/column) to byte offsets. The [`SourcePosition`]s

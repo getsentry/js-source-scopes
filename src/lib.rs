@@ -1,4 +1,11 @@
-// TODO: should we rather have `usize` everywhere instead of `u32`?
+//! This crate provides functionality for extracting and processing scope information from JS.
+//!
+//! # Features
+//! * Extracting scopes from source text using [`extract_scope_names`]
+//! * Fast lookup of scopes by byte offset using [`ScopeIndex`]
+//! * Fast conversion between line/column source positions and byte offsets using [`SourceContext`]
+//! * Resolution of minified scope names to their original names using [`NameResolver`]
+#![warn(missing_docs)]
 
 use std::ops::Range;
 
