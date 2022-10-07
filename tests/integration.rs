@@ -46,6 +46,7 @@ fn resolves_scope_names() {
 
     let scopes = extract_scope_names(&src);
     // dbg!(&scopes);
+
     let scopes: Vec<_> = scopes
         .into_iter()
         .map(|s| (s.0, s.1.map(|n| n.to_string()).filter(|s| !s.is_empty())))

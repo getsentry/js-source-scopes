@@ -1,3 +1,6 @@
+// TODO: punctuation components
+#![allow(dead_code)]
+
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Range;
@@ -5,10 +8,6 @@ use std::ops::Range;
 use swc_ecma_visit::swc_ecma_ast as ast;
 
 use crate::swc::convert_span;
-
-//use rslint_parser::SyntaxToken;
-
-//use crate::rslint::convert_text_range;
 
 #[derive(Debug)]
 pub(crate) struct SyntaxToken;
@@ -64,7 +63,7 @@ impl NameComponent {
     pub fn range(&self) -> Option<Range<u32>> {
         match &self.inner {
             NameComponentInner::SourceIdentifierToken(t) => Some(convert_span(t.span)),
-            NameComponentInner::SourcePunctuationToken(t) => {
+            NameComponentInner::SourcePunctuationToken(_t) => {
                 None
                 //Some(convert_text_range(t.text_range()))
             }

@@ -69,6 +69,8 @@ impl VisitAstPath for FnVisitor {
         let name = infer_name_from_ctx(path);
 
         self.scopes.push((convert_span(node.span), name));
+
+        node.visit_children_with_path(self, path);
     }
 
     fn visit_function<'ast: 'r, 'r>(
@@ -134,11 +136,63 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
         match parent {
             // These create a new scope. If we reached this, it means we didn’t
             // use any of the other parents properly.
-            Parent::Function(..)
-            | Parent::ArrowExpr(..)
-            | Parent::Constructor(..)
-            | Parent::ClassMethod(..)
-            | Parent::PrivateMethod(..) => return None,
+            Parent::Function(..) | Parent::ArrowExpr(..) | Parent::Constructor(..) => return None,
+
+            // A class which is the parent of a method for which we already
+            // have part of the name.
+            Parent::ClassExpr(class_expr, _) => {
+                if let Some(ident) = &class_expr.ident {
+                    scope_name
+                        .components
+                        .push_front(NameComponent::ident(ident.clone()));
+                }
+            }
+            Parent::ClassDecl(class_decl, _) => {
+                push_sep(&mut scope_name);
+                scope_name
+                    .components
+                    .push_front(NameComponent::ident(class_decl.ident.clone()));
+                return Some(scope_name);
+            }
+
+            // An object literal member:
+            // `{ $name() ... }`
+            Parent::MethodProp(method, _) => {
+                if let Some(ident) = method.key.as_ident() {
+                    scope_name
+                        .components
+                        .push_front(NameComponent::ident(ident.clone()));
+                }
+            }
+
+            // An object literal property:
+            // `{ $name: ... }`
+            Parent::KeyValueProp(kv, _) => {
+                if let Some(ident) = kv.key.as_ident() {
+                    scope_name
+                        .components
+                        .push_front(NameComponent::ident(ident.clone()));
+                }
+            }
+
+            // A class method:
+            // `class { $name() ... }`
+            Parent::ClassMethod(method, _) => {
+                if let Some(ident) = method.key.as_ident() {
+                    scope_name
+                        .components
+                        .push_front(NameComponent::ident(ident.clone()));
+                }
+            }
+
+            // A private class method:
+            // `class { #$name() ... }`
+            Parent::PrivateMethod(method, _) => {
+                scope_name
+                    .components
+                    .push_front(NameComponent::ident(method.key.id.clone()));
+                scope_name.components.push_front(NameComponent::interp("#"));
+            }
 
             // A variable declaration with a name:
             // `var $name = ...`
