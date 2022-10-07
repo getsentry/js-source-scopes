@@ -9,9 +9,7 @@ use crate::scope_name::{NameComponent, ScopeName};
 use crate::Scopes;
 
 // TODO:
-// - extract names for class / literal methods
 // - getters / setters
-// - private methods
 // - maybe even computed properties?
 // - "punctuation" tokens that allow inferring a name from an inlined call expression
 
