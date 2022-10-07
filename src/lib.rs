@@ -4,15 +4,18 @@
 use std::ops::Range;
 
 mod name_resolver;
-mod rslint;
 mod scope_index;
 mod scope_name;
 mod source;
+mod swc;
 
 pub use name_resolver::NameResolver;
 pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
+
+/// The Scopes extracted from a piece of JS Code.
+pub type Scopes = Vec<(Range<u32>, Option<ScopeName>)>;
 
 /// Extracts function scopes from the given JS-like `src`.
 ///
@@ -50,31 +53,6 @@ pub use source::{SourceContext, SourceContextError, SourcePosition};
 /// assert_eq!(scopes, expected);
 /// ```
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn extract_scope_names(src: &str) -> Vec<(Range<u32>, Option<ScopeName>)> {
-    rslint::parse_with_rslint(src)
+pub fn extract_scope_names(src: &str) -> Scopes {
+    swc::parse_with_swc(src)
 }
-
-// TODO: maybe see if swc makes scope extraction easier / faster ?
-/*mod swc {
-    use swc_ecma_parser::lexer::Lexer;
-    use swc_ecma_parser::{Parser, StringInput, TsConfig};
-
-    pub fn parse_with_swc(src: &str) {
-        swc_ecma_parser::parse_file_as_module();
-
-        let source = SourceFile;
-
-        let mut parser = Parser::new(
-            swc_ecma_parser::Syntax::Typescript(TsConfig {
-                tsx: true,
-                decorators: true,
-                dts: true,
-                no_early_errors: true,
-            }),
-            StringInput::from(src),
-            None,
-        );
-
-        let module = parser.parse_module().unwrap();
-    }
-}*/
