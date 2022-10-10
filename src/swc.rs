@@ -28,11 +28,11 @@ pub fn parse_with_swc(src: &str) -> Scopes {
     // dbg!(&syntax);
 
     tracing::trace_span!("extracting scopes").in_scope(|| {
-        let mut visitor = FnVisitor::new();
+        let mut collector = ScopeCollector::new();
 
-        syntax.visit_children_with_path(&mut visitor, &mut Default::default());
+        syntax.visit_children_with_path(&mut collector, &mut Default::default());
 
-        visitor.into_scopes()
+        collector.into_scopes()
     })
 }
 
@@ -41,11 +41,11 @@ pub(crate) fn convert_span(span: Span) -> Range<u32> {
     span.lo.0..span.hi.0
 }
 
-struct FnVisitor {
+struct ScopeCollector {
     scopes: Scopes,
 }
 
-impl FnVisitor {
+impl ScopeCollector {
     fn new() -> Self {
         Self { scopes: vec![] }
     }
@@ -57,7 +57,7 @@ impl FnVisitor {
 
 use swc_ecma_visit::AstParentNodeRef as Parent;
 
-impl VisitAstPath for FnVisitor {
+impl VisitAstPath for ScopeCollector {
     fn visit_arrow_expr<'ast: 'r, 'r>(
         &mut self,
         node: &'ast ast::ArrowExpr,
