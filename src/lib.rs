@@ -39,6 +39,7 @@ pub type Scopes = Vec<(Range<u32>, Option<ScopeName>)>;
 /// let src = "const arrowFnExpr = (a) => a; function namedFnDecl() {}";
 /// //                arrowFnExpr -^------^  ^------namedFnDecl------^
 /// let mut scopes: Vec<_> = js_source_scopes::extract_scope_names(src)
+///     .unwrap()
 ///     .into_iter()
 ///     .map(|res| {
 ///         let components = res.1.map(|n| n.components().map(|c| {

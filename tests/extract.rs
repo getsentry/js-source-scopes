@@ -121,3 +121,85 @@ fn extract_method_names() {
     ];
     assert_eq!(scopes, expected);
 }
+
+#[test]
+fn extract_class_getter_setter() {
+    let src = r#"
+      class A {
+        get foo() {}
+        set foo(x) {}
+      }
+    "#;
+
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        (7..67, Some("new A".into())),
+        (25..37, Some("get A.foo".into())),
+        (46..59, Some("set A.foo".into())),
+    ];
+    assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_object_getter_setter() {
+    let src = r#"
+      a = {
+        get foo() {},
+        set foo(x) {}
+      }  
+    "#;
+
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        (21..33, Some("get a.foo".into())),
+        (43..56, Some("set a.foo".into())),
+    ];
+    assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_object_weird_properties() {
+    let src = r#"
+      a = {
+        ["foo" + 123]() {},
+        1.7() {},
+        "bar"() {},
+        1n() {}
+      }
+    "#;
+
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        (21..39, Some("a.<computed property name>".into())),
+        (49..57, Some("a.<1.7>".into())),
+        (67..77, Some("a.<\"bar\">".into())),
+        (87..94, Some("a.<1n>".into())),
+    ];
+    assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_named_class_expr() {
+    let src = r#"
+      a = class B {
+         foo() {}
+         get bar() {}
+      }  
+    "#;
+
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        (11..68, Some("new B".into())),
+        (30..38, Some("B.foo".into())),
+        (48..60, Some("get B.bar".into())),
+    ];
+    assert_eq!(scopes, expected);
+}

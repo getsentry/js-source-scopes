@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Range;
@@ -60,9 +61,9 @@ impl NameComponent {
         }
     }
 
-    pub(crate) fn interp(s: &'static str) -> Self {
+    pub(crate) fn interp(s: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            inner: NameComponentInner::Interpolation(s),
+            inner: NameComponentInner::Interpolation(s.into()),
         }
     }
     pub(crate) fn ident(ident: ast::Ident) -> Self {
@@ -74,6 +75,6 @@ impl NameComponent {
 
 #[derive(Debug)]
 pub(crate) enum NameComponentInner {
-    Interpolation(&'static str),
+    Interpolation(Cow<'static, str>),
     SourceIdentifierToken(ast::Ident),
 }

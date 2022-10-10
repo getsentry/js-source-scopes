@@ -10,10 +10,6 @@ use crate::Scopes;
 
 pub(crate) use swc_ecma_parser::error::Error as ParseError;
 
-// TODO:
-// - getters / setters
-// - maybe even computed properties?
-
 pub fn parse_with_swc(src: &str) -> Result<Scopes, ParseError> {
     let syntax = tracing::trace_span!("parsing source").in_scope(|| {
         let input = StringInput::new(src, BytePos(0), BytePos(src.len() as u32));
@@ -116,6 +112,46 @@ impl VisitAstPath for ScopeCollector {
 
         node.visit_children_with_path(self, path);
     }
+
+    fn visit_getter_prop<'ast: 'r, 'r>(
+        &mut self,
+        node: &'ast ast::GetterProp,
+        path: &mut AstNodePath<'r>,
+    ) {
+        let mut name = match infer_name_from_ctx(path) {
+            Some(mut scope_name) => {
+                scope_name.components.push_back(NameComponent::interp("."));
+                scope_name
+            }
+            None => ScopeName::new(),
+        };
+        name.components.push_back(prop_name_to_component(&node.key));
+        name.components.push_front(NameComponent::interp("get "));
+
+        self.scopes.push((convert_span(node.span), Some(name)));
+
+        node.visit_children_with_path(self, path);
+    }
+
+    fn visit_setter_prop<'ast: 'r, 'r>(
+        &mut self,
+        node: &'ast ast::SetterProp,
+        path: &mut AstNodePath<'r>,
+    ) {
+        let mut name = match infer_name_from_ctx(path) {
+            Some(mut scope_name) => {
+                scope_name.components.push_back(NameComponent::interp("."));
+                scope_name
+            }
+            None => ScopeName::new(),
+        };
+        name.components.push_back(prop_name_to_component(&node.key));
+        name.components.push_front(NameComponent::interp("set "));
+
+        self.scopes.push((convert_span(node.span), Some(name)));
+
+        node.visit_children_with_path(self, path);
+    }
 }
 
 /// Uses either the provided [`ast::Ident`] or infers the name from the `path`.
@@ -133,6 +169,7 @@ fn name_from_ident_or_ctx(ident: Option<ast::Ident>, path: &AstNodePath) -> Opti
 /// Tries to infer a name by walking up the path of ancestors.
 fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
     let mut scope_name = ScopeName::new();
+    let mut kind = ast::MethodKind::Method;
 
     fn push_sep(name: &mut ScopeName) {
         if !name.components.is_empty() {
@@ -150,9 +187,14 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
             // have part of the name.
             Parent::ClassExpr(class_expr, _) => {
                 if let Some(ident) = &class_expr.ident {
+                    push_sep(&mut scope_name);
                     scope_name
                         .components
                         .push_front(NameComponent::ident(ident.clone()));
+
+                    prefix_getters_setters(kind, &mut scope_name);
+
+                    return Some(scope_name);
                 }
             }
             Parent::ClassDecl(class_decl, _) => {
@@ -160,17 +202,18 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
                 scope_name
                     .components
                     .push_front(NameComponent::ident(class_decl.ident.clone()));
+
+                prefix_getters_setters(kind, &mut scope_name);
+
                 return Some(scope_name);
             }
 
             // An object literal member:
             // `{ $name() ... }`
             Parent::MethodProp(method, _) => {
-                if let Some(ident) = method.key.as_ident() {
-                    scope_name
-                        .components
-                        .push_front(NameComponent::ident(ident.clone()));
-                }
+                scope_name
+                    .components
+                    .push_front(prop_name_to_component(&method.key));
             }
 
             // An object literal property:
@@ -186,11 +229,11 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
             // A class method:
             // `class { $name() ... }`
             Parent::ClassMethod(method, _) => {
-                if let Some(ident) = method.key.as_ident() {
-                    scope_name
-                        .components
-                        .push_front(NameComponent::ident(ident.clone()));
-                }
+                scope_name
+                    .components
+                    .push_front(prop_name_to_component(&method.key));
+
+                kind = method.kind;
             }
 
             // A private class method:
@@ -210,6 +253,9 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
                     scope_name
                         .components
                         .push_front(NameComponent::ident(ident.id.clone()));
+
+                    prefix_getters_setters(kind, &mut scope_name);
+
                     return Some(scope_name);
                 }
             }
@@ -224,6 +270,8 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
                         expr_name.components.append(&mut scope_name.components);
                         scope_name.components = expr_name.components;
 
+                        prefix_getters_setters(kind, &mut scope_name);
+
                         return Some(scope_name);
                     }
                 }
@@ -233,6 +281,9 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
                         scope_name
                             .components
                             .push_front(NameComponent::ident(ident.id.clone()));
+
+                        prefix_getters_setters(kind, &mut scope_name);
+
                         return Some(scope_name);
                     }
                     ast::Pat::Expr(expr) => {
@@ -241,6 +292,8 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                             expr_name.components.append(&mut scope_name.components);
                             scope_name.components = expr_name.components;
+
+                            prefix_getters_setters(kind, &mut scope_name);
 
                             return Some(scope_name);
                         }
@@ -254,6 +307,18 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
     }
 
     None
+}
+
+fn prefix_getters_setters(kind: ast::MethodKind, scope_name: &mut ScopeName) {
+    match kind {
+        ast::MethodKind::Getter => scope_name
+            .components
+            .push_front(NameComponent::interp("get ")),
+        ast::MethodKind::Setter => scope_name
+            .components
+            .push_front(NameComponent::interp("set ")),
+        _ => {}
+    }
 }
 
 /// Returns a [`ScopeName`] corresponding to the given [`ast::Expr`].
@@ -289,5 +354,15 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
 
             _ => return None,
         }
+    }
+}
+
+fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
+    match prop {
+        ast::PropName::Ident(ref i) => NameComponent::ident(i.clone()),
+        ast::PropName::Str(s) => NameComponent::interp(format!("<\"{}\">", s.value)),
+        ast::PropName::Num(n) => NameComponent::interp(format!("<{}>", n)),
+        ast::PropName::Computed(_) => NameComponent::interp("<computed property name>"),
+        ast::PropName::BigInt(i) => NameComponent::interp(format!("<{}n>", i.value)),
     }
 }
