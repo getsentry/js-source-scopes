@@ -41,6 +41,19 @@ pub(crate) fn convert_span(span: Span) -> Range<u32> {
     span.lo.0..span.hi.0
 }
 
+/// The ScopeCollector is responsible for collection function scopes and computing their names.
+///
+/// SWCs AST is based around the Visitor pattern. In this case our visitor has some
+/// method that act on different function-like AST nodes that we are interested in.
+/// From there, the node either has a name itself, or we infer its name from the
+/// "path" of parents.
+/// As a concrete example:
+/// `const name = () => {};`
+/// 1. The visitors `visit_arrow_expr` function is invoked for the arrow function
+///    on the right hand side. Arrow functions by definition do not have a name.
+/// 2. We use the "path" to walk up to the VariableDeclarator.
+/// 3. That declarator has a binding pattern on the left hand side, which we use
+///    to infer the `name` for the anonymous arrow function expression.
 struct ScopeCollector {
     scopes: Scopes,
 }
