@@ -11,7 +11,6 @@ use crate::Scopes;
 // TODO:
 // - getters / setters
 // - maybe even computed properties?
-// - "punctuation" tokens that allow inferring a name from an inlined call expression
 
 pub fn parse_with_swc(src: &str) -> Scopes {
     let syntax = tracing::trace_span!("parsing source").in_scope(|| {

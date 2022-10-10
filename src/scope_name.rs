@@ -1,6 +1,3 @@
-// TODO: punctuation components
-#![allow(dead_code)]
-
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Range;
@@ -8,9 +5,6 @@ use std::ops::Range;
 use swc_ecma_visit::swc_ecma_ast as ast;
 
 use crate::swc::convert_span;
-
-#[derive(Debug)]
-pub(crate) struct SyntaxToken;
 
 /// An abstract scope name which can consist of multiple [`NameComponent`]s.
 #[derive(Debug)]
@@ -52,7 +46,6 @@ impl NameComponent {
         match &self.inner {
             NameComponentInner::Interpolation(s) => s,
             NameComponentInner::SourceIdentifierToken(t) => &t.sym,
-            NameComponentInner::SourcePunctuationToken(_) => "",
         }
     }
 
@@ -63,10 +56,6 @@ impl NameComponent {
     pub fn range(&self) -> Option<Range<u32>> {
         match &self.inner {
             NameComponentInner::SourceIdentifierToken(t) => Some(convert_span(t.span)),
-            NameComponentInner::SourcePunctuationToken(_t) => {
-                None
-                //Some(convert_text_range(t.text_range()))
-            }
             _ => None,
         }
     }
@@ -81,16 +70,10 @@ impl NameComponent {
             inner: NameComponentInner::SourceIdentifierToken(ident),
         }
     }
-    pub(crate) fn punct(token: SyntaxToken) -> Self {
-        Self {
-            inner: NameComponentInner::SourcePunctuationToken(token),
-        }
-    }
 }
 
 #[derive(Debug)]
 pub(crate) enum NameComponentInner {
     Interpolation(&'static str),
     SourceIdentifierToken(ast::Ident),
-    SourcePunctuationToken(SyntaxToken),
 }
