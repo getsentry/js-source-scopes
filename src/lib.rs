@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 
+use std::fmt::Display;
 use std::ops::Range;
 
 mod name_resolver;
@@ -13,6 +14,7 @@ pub use name_resolver::NameResolver;
 pub use scope_index::{ScopeIndex, ScopeIndexError, ScopeLookupResult};
 pub use scope_name::{NameComponent, ScopeName};
 pub use source::{SourceContext, SourceContextError, SourcePosition};
+use swc_common::Spanned;
 
 /// The Scopes extracted from a piece of JS Code.
 pub type Scopes = Vec<(Range<u32>, Option<ScopeName>)>;
@@ -53,6 +55,26 @@ pub type Scopes = Vec<(Range<u32>, Option<ScopeName>)>;
 /// assert_eq!(scopes, expected);
 /// ```
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn extract_scope_names(src: &str) -> Scopes {
-    swc::parse_with_swc(src)
+pub fn extract_scope_names(src: &str) -> Result<Scopes, ParseError> {
+    swc::parse_with_swc(src).map_err(|e| ParseError { inner: e })
 }
+
+/// An error parsing the JS Source provided to [`extract_scope_names`].
+#[derive(Debug)]
+pub struct ParseError {
+    inner: swc::ParseError,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let span = self.inner.span();
+        f.write_fmt(format_args!(
+            "{}:{}:{}",
+            span.lo.0,
+            span.hi.0,
+            self.inner.kind().msg()
+        ))
+    }
+}
+
+impl std::error::Error for ParseError {}

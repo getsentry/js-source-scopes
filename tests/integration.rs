@@ -30,7 +30,7 @@ fn resolves_scopes_simple() {
     let minified = std::fs::read_to_string("tests/fixtures/simple/minified.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/simple/minified.js.map").unwrap();
 
-    let scopes = extract_scope_names(&minified);
+    let scopes = extract_scope_names(&minified).unwrap();
 
     let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 
@@ -44,7 +44,7 @@ fn resolves_scopes_simple() {
 fn resolves_scope_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
-    let scopes = extract_scope_names(&src);
+    let scopes = extract_scope_names(&src).unwrap();
     // dbg!(&scopes);
 
     let scopes: Vec<_> = scopes
@@ -173,7 +173,7 @@ fn resolves_token_from_names() {
     let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
 
-    let scopes = extract_scope_names(&minified);
+    let scopes = extract_scope_names(&minified).unwrap();
 
     let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 
@@ -189,7 +189,7 @@ fn parses_large_vendors() {
     let minified = std::fs::read_to_string("tests/fixtures/vendors/vendors.js").unwrap();
     let map = std::fs::read_to_string("tests/fixtures/vendors/vendors.js.map").unwrap();
 
-    let scopes = extract_scope_names(&minified);
+    let scopes = extract_scope_names(&minified).unwrap();
 
     let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 

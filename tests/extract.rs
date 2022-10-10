@@ -16,7 +16,7 @@ fn extracts_named_fn() {
             return function fn_expr() {};
         }
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [
@@ -35,7 +35,7 @@ fn extracts_named_class() {
             }
         }
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [
@@ -52,7 +52,7 @@ fn infer_from_decl() {
         let anon_class = class {};
         const arrow = () => {};
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [
@@ -69,7 +69,7 @@ fn infer_from_assign() {
         assigned_fn = function () {};
         deep.assigned.klass = class {};
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [
@@ -89,7 +89,7 @@ fn extract_obj_literal() {
             method_prop() {},
         };
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [
@@ -110,7 +110,7 @@ fn extract_method_names() {
             #private_method() {}
         }
         "#;
-    let scopes = extract_scope_names(src);
+    let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
     let expected = [

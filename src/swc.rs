@@ -8,22 +8,20 @@ use swc_ecma_visit::{AstNodePath, VisitAstPath, VisitWithPath};
 use crate::scope_name::{NameComponent, ScopeName};
 use crate::Scopes;
 
+pub(crate) use swc_ecma_parser::error::Error as ParseError;
+
 // TODO:
 // - getters / setters
 // - maybe even computed properties?
 
-pub fn parse_with_swc(src: &str) -> Scopes {
+pub fn parse_with_swc(src: &str) -> Result<Scopes, ParseError> {
     let syntax = tracing::trace_span!("parsing source").in_scope(|| {
         let input = StringInput::new(src, BytePos(0), BytePos(src.len() as u32));
 
         let mut parser = Parser::new(swc_ecma_parser::Syntax::default(), input, None);
 
         parser.parse_module()
-    });
-    let syntax = match syntax {
-        Ok(syntax) => syntax,
-        Err(_) => return vec![],
-    };
+    })?;
 
     // dbg!(&syntax);
 
@@ -32,7 +30,7 @@ pub fn parse_with_swc(src: &str) -> Scopes {
 
         syntax.visit_children_with_path(&mut collector, &mut Default::default());
 
-        collector.into_scopes()
+        Ok(collector.into_scopes())
     })
 }
 
