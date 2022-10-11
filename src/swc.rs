@@ -72,7 +72,7 @@ impl VisitAstPath for ScopeCollector {
     ) {
         let name = infer_name_from_ctx(path);
 
-        self.scopes.push((convert_span(node.span), name));
+        self.scopes.push((convert_span(node.span), Some(name)));
 
         node.visit_children_with_path(self, path);
     }
@@ -89,7 +89,7 @@ impl VisitAstPath for ScopeCollector {
         };
         let name = name_from_ident_or_ctx(ident, path);
 
-        self.scopes.push((convert_span(node.span), name));
+        self.scopes.push((convert_span(node.span), Some(name)));
 
         node.visit_children_with_path(self, path);
     }
@@ -104,11 +104,11 @@ impl VisitAstPath for ScopeCollector {
             _ => None,
         };
         let mut name = name_from_ident_or_ctx(ident, path);
-        if let Some(name) = &mut name {
+        if !name.components.is_empty() {
             name.components.push_front(NameComponent::interp("new "));
         }
 
-        self.scopes.push((convert_span(node.span), name));
+        self.scopes.push((convert_span(node.span), Some(name)));
 
         node.visit_children_with_path(self, path);
     }
@@ -118,13 +118,12 @@ impl VisitAstPath for ScopeCollector {
         node: &'ast ast::GetterProp,
         path: &mut AstNodePath<'r>,
     ) {
-        let mut name = match infer_name_from_ctx(path) {
-            Some(mut scope_name) => {
-                scope_name.components.push_back(NameComponent::interp("."));
-                scope_name
-            }
-            None => ScopeName::new(),
-        };
+        let mut name = infer_name_from_ctx(path);
+
+        if !name.components.is_empty() {
+            name.components.push_back(NameComponent::interp("."));
+        }
+
         name.components.push_back(prop_name_to_component(&node.key));
         name.components.push_front(NameComponent::interp("get "));
 
@@ -138,13 +137,12 @@ impl VisitAstPath for ScopeCollector {
         node: &'ast ast::SetterProp,
         path: &mut AstNodePath<'r>,
     ) {
-        let mut name = match infer_name_from_ctx(path) {
-            Some(mut scope_name) => {
-                scope_name.components.push_back(NameComponent::interp("."));
-                scope_name
-            }
-            None => ScopeName::new(),
-        };
+        let mut name = infer_name_from_ctx(path);
+
+        if !name.components.is_empty() {
+            name.components.push_back(NameComponent::interp("."));
+        }
+
         name.components.push_back(prop_name_to_component(&node.key));
         name.components.push_front(NameComponent::interp("set "));
 
@@ -155,29 +153,21 @@ impl VisitAstPath for ScopeCollector {
 }
 
 /// Uses either the provided [`ast::Ident`] or infers the name from the `path`.
-fn name_from_ident_or_ctx(ident: Option<ast::Ident>, path: &AstNodePath) -> Option<ScopeName> {
-    let name = infer_name_from_ctx(path);
-    match (name, ident) {
-        (Some(mut name), Some(ident)) => {
-            name.components.pop_back();
-            name.components.push_back(NameComponent::ident(ident));
-            Some(name)
-        }
-
-        (None, Some(ident)) => {
-            let mut name = ScopeName::new();
-            name.components.push_back(NameComponent::ident(ident));
-            Some(name)
-        }
-
-        (name, _) => name,
+fn name_from_ident_or_ctx(ident: Option<ast::Ident>, path: &AstNodePath) -> ScopeName {
+    let mut name = infer_name_from_ctx(path);
+    if let Some(ident) = ident {
+        name.components.pop_back();
+        name.components.push_back(NameComponent::ident(ident));
     }
+
+    name
 }
 
 /// Tries to infer a name by walking up the path of ancestors.
-fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
+fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
     let mut scope_name = ScopeName::new();
     let mut kind = ast::MethodKind::Method;
+    let mut in_object_lit = false;
 
     fn push_sep(name: &mut ScopeName) {
         if !name.components.is_empty() {
@@ -189,7 +179,15 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
         match parent {
             // These create a new scope. If we reached this, it means we didn’t
             // use any of the other parents properly.
-            Parent::Function(..) | Parent::ArrowExpr(..) | Parent::Constructor(..) => return None,
+            Parent::Function(..) | Parent::ArrowExpr(..) | Parent::Constructor(..) => {
+                if in_object_lit && !scope_name.components.is_empty() {
+                    scope_name
+                        .components
+                        .push_front(NameComponent::interp("<object>."));
+                }
+                prefix_getters_setters(kind, &mut scope_name);
+                return scope_name;
+            }
 
             // A class which is the parent of a method for which we already
             // have part of the name.
@@ -199,10 +197,6 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
                     scope_name
                         .components
                         .push_front(NameComponent::ident(ident.clone()));
-
-                    prefix_getters_setters(kind, &mut scope_name);
-
-                    return Some(scope_name);
                 }
             }
             Parent::ClassDecl(class_decl, _) => {
@@ -213,7 +207,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                 prefix_getters_setters(kind, &mut scope_name);
 
-                return Some(scope_name);
+                return scope_name;
             }
 
             // An object literal member:
@@ -264,7 +258,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                     prefix_getters_setters(kind, &mut scope_name);
 
-                    return Some(scope_name);
+                    return scope_name;
                 }
             }
 
@@ -280,7 +274,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                         prefix_getters_setters(kind, &mut scope_name);
 
-                        return Some(scope_name);
+                        return scope_name;
                     }
                 }
                 ast::PatOrExpr::Pat(pat) => match pat.as_ref() {
@@ -292,7 +286,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                         prefix_getters_setters(kind, &mut scope_name);
 
-                        return Some(scope_name);
+                        return scope_name;
                     }
                     ast::Pat::Expr(expr) => {
                         if let Some(mut expr_name) = infer_name_from_expr(expr) {
@@ -303,18 +297,28 @@ fn infer_name_from_ctx(path: &AstNodePath) -> Option<ScopeName> {
 
                             prefix_getters_setters(kind, &mut scope_name);
 
-                            return Some(scope_name);
+                            return scope_name;
                         }
                     }
                     _ => {}
                 },
             },
 
+            Parent::ObjectLit(_, _) => {
+                in_object_lit = true;
+            }
+
             _ => {}
         }
     }
 
-    None
+    if in_object_lit && !scope_name.components.is_empty() {
+        scope_name
+            .components
+            .push_front(NameComponent::interp("<object>."));
+    }
+    prefix_getters_setters(kind, &mut scope_name);
+    scope_name
 }
 
 fn prefix_getters_setters(kind: ast::MethodKind, scope_name: &mut ScopeName) {

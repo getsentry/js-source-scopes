@@ -57,7 +57,18 @@ pub type Scopes = Vec<(Range<u32>, Option<ScopeName>)>;
 /// ```
 #[tracing::instrument(level = "trace", skip_all)]
 pub fn extract_scope_names(src: &str) -> Result<Scopes, ParseError> {
-    swc::parse_with_swc(src).map_err(|e| ParseError { inner: e })
+    let mut scopes = swc::parse_with_swc(src).map_err(|e| ParseError { inner: e })?;
+
+    // filter out empty names
+    for scope in &mut scopes {
+        if let Some(ref name) = scope.1 {
+            if name.components.is_empty() {
+                scope.1 = None;
+            }
+        }
+    }
+
+    Ok(scopes)
 }
 
 /// An error parsing the JS Source provided to [`extract_scope_names`].

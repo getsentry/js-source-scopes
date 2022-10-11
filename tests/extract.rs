@@ -1,10 +1,9 @@
-
 use js_source_scopes::{extract_scope_names, Scopes};
 
 fn scope_strs(scopes: Scopes) -> Vec<Option<String>> {
     scopes
         .into_iter()
-        .map(|s| s.1.map(|n| n.to_string()).filter(|s| !s.is_empty()))
+        .map(|s| s.1.map(|n| n.to_string()))
         .collect()
 }
 
@@ -187,11 +186,45 @@ fn extract_named_class_expr() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        Some("new B".into()),
-        Some("B.foo".into()),
-        Some("get B.bar".into()),
+        Some("new a.B".into()),
+        Some("a.B.foo".into()),
+        Some("get a.B.bar".into()),
     ];
     assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_anon_obj_literal() {
+    let src = r#"
+         ({
+            named_prop: function named_fun() {},
+            anon_prop: function () {},
+            arrow_prop: () => {},
+            method_prop() {},
+        });
+        "#;
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        Some("<object>.named_fun".into()),
+        Some("<object>.anon_prop".into()),
+        Some("<object>.arrow_prop".into()),
+        Some("<object>.method_prop".into()),
     ];
+    assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_empty_function() {
+    let src = r#"
+         (function () {
+          return () => {};
+        })()
+        "#;
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [None, None];
     assert_eq!(scopes, expected);
 }
