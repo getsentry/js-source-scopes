@@ -1,11 +1,10 @@
-use std::ops::Range;
 
 use js_source_scopes::{extract_scope_names, Scopes};
 
-fn scope_strs(scopes: Scopes) -> Vec<(Range<u32>, Option<String>)> {
+fn scope_strs(scopes: Scopes) -> Vec<Option<String>> {
     scopes
         .into_iter()
-        .map(|s| (s.0, s.1.map(|n| n.to_string()).filter(|s| !s.is_empty())))
+        .map(|s| s.1.map(|n| n.to_string()).filter(|s| !s.is_empty()))
         .collect()
 }
 
@@ -19,10 +18,7 @@ fn extracts_named_fn() {
     let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
-    let expected = [
-        (9..81, Some("fn_decl".into())),
-        (49..70, Some("fn_expr".into())),
-    ];
+    let expected = [Some("fn_decl".into()), Some("fn_expr".into())];
     assert_eq!(scopes, expected);
 }
 
@@ -38,10 +34,7 @@ fn extracts_named_class() {
     let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
-    let expected = [
-        (9..123, Some("new class_decl".into())),
-        (79..98, Some("new class_expr".into())),
-    ];
+    let expected = [Some("new class_decl".into()), Some("new class_expr".into())];
     assert_eq!(scopes, expected);
 }
 
@@ -56,9 +49,9 @@ fn infer_from_decl() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (23..37, Some("anon_fn".into())),
-        (64..72, Some("new anon_class".into())),
-        (96..104, Some("arrow".into())),
+        Some("anon_fn".into()),
+        Some("new anon_class".into()),
+        Some("arrow".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -73,8 +66,8 @@ fn infer_from_assign() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (23..37, Some("assigned_fn".into())),
-        (69..77, Some("new deep.assigned.klass".into())),
+        Some("assigned_fn".into()),
+        Some("new deep.assigned.klass".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -93,10 +86,10 @@ fn extract_obj_literal() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (55..78, Some("obj_literal.named_fun".into())),
-        (103..117, Some("obj_literal.anon_prop".into())),
-        (143..151, Some("obj_literal.arrow_prop".into())),
-        (165..181, Some("obj_literal.method_prop".into())),
+        Some("obj_literal.named_fun".into()),
+        Some("obj_literal.anon_prop".into()),
+        Some("obj_literal.arrow_prop".into()),
+        Some("obj_literal.method_prop".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -114,10 +107,10 @@ fn extract_method_names() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (9..138, Some("new class_decl".into())),
-        (40..65, Some("class_decl.static_method".into())),
-        (78..95, Some("class_decl.class_method".into())),
-        (108..128, Some("class_decl.#private_method".into())),
+        Some("new class_decl".into()),
+        Some("class_decl.static_method".into()),
+        Some("class_decl.class_method".into()),
+        Some("class_decl.#private_method".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -135,9 +128,9 @@ fn extract_class_getter_setter() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (7..67, Some("new A".into())),
-        (25..37, Some("get A.foo".into())),
-        (46..59, Some("set A.foo".into())),
+        Some("new A".into()),
+        Some("get A.foo".into()),
+        Some("set A.foo".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -154,10 +147,7 @@ fn extract_object_getter_setter() {
     let scopes = extract_scope_names(src).unwrap();
     let scopes = scope_strs(scopes);
 
-    let expected = [
-        (21..33, Some("get a.foo".into())),
-        (43..56, Some("set a.foo".into())),
-    ];
+    let expected = [Some("get a.foo".into()), Some("set a.foo".into())];
     assert_eq!(scopes, expected);
 }
 
@@ -176,10 +166,10 @@ fn extract_object_weird_properties() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (21..39, Some("a.<computed>".into())),
-        (49..57, Some("a.<1.7>".into())),
-        (67..77, Some("a.<\"bar\">".into())),
-        (87..94, Some("a.<1n>".into())),
+        Some("a.<computed>".into()),
+        Some("a.<1.7>".into()),
+        Some("a.<\"bar\">".into()),
+        Some("a.<1n>".into()),
     ];
     assert_eq!(scopes, expected);
 }
@@ -197,9 +187,11 @@ fn extract_named_class_expr() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (11..68, Some("new B".into())),
-        (30..38, Some("B.foo".into())),
-        (48..60, Some("get B.bar".into())),
+        Some("new B".into()),
+        Some("B.foo".into()),
+        Some("get B.bar".into()),
+    ];
+    assert_eq!(scopes, expected);
     ];
     assert_eq!(scopes, expected);
 }
