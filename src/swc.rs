@@ -156,13 +156,21 @@ impl VisitAstPath for ScopeCollector {
 
 /// Uses either the provided [`ast::Ident`] or infers the name from the `path`.
 fn name_from_ident_or_ctx(ident: Option<ast::Ident>, path: &AstNodePath) -> Option<ScopeName> {
-    match ident {
-        Some(ident) => {
+    let name = infer_name_from_ctx(path);
+    match (name, ident) {
+        (Some(mut name), Some(ident)) => {
+            name.components.pop_back();
+            name.components.push_back(NameComponent::ident(ident));
+            Some(name)
+        }
+
+        (None, Some(ident)) => {
             let mut name = ScopeName::new();
             name.components.push_back(NameComponent::ident(ident));
             Some(name)
         }
-        None => infer_name_from_ctx(path),
+
+        (name, _) => name,
     }
 }
 

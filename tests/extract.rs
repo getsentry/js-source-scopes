@@ -83,7 +83,7 @@ fn infer_from_assign() {
 fn extract_obj_literal() {
     let src = r#"
         const obj_literal = {
-            named_prop: function named_prop() {},
+            named_prop: function named_fun() {},
             anon_prop: function () {},
             arrow_prop: () => {},
             method_prop() {},
@@ -93,10 +93,10 @@ fn extract_obj_literal() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (55..79, Some("named_prop".into())),
-        (104..118, Some("obj_literal.anon_prop".into())),
-        (144..152, Some("obj_literal.arrow_prop".into())),
-        (166..182, Some("obj_literal.method_prop".into())),
+        (55..78, Some("obj_literal.named_fun".into())),
+        (103..117, Some("obj_literal.anon_prop".into())),
+        (143..151, Some("obj_literal.arrow_prop".into())),
+        (165..181, Some("obj_literal.method_prop".into())),
     ];
     assert_eq!(scopes, expected);
 }
