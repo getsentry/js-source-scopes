@@ -176,7 +176,7 @@ fn extract_object_weird_properties() {
     let scopes = scope_strs(scopes);
 
     let expected = [
-        (21..39, Some("a.<computed property name>".into())),
+        (21..39, Some("a.<computed>".into())),
         (49..57, Some("a.<1.7>".into())),
         (67..77, Some("a.<\"bar\">".into())),
         (87..94, Some("a.<1n>".into())),

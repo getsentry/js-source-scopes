@@ -362,7 +362,7 @@ fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
         ast::PropName::Ident(ref i) => NameComponent::ident(i.clone()),
         ast::PropName::Str(s) => NameComponent::interp(format!("<\"{}\">", s.value)),
         ast::PropName::Num(n) => NameComponent::interp(format!("<{}>", n)),
-        ast::PropName::Computed(_) => NameComponent::interp("<computed property name>"),
+        ast::PropName::Computed(_) => NameComponent::interp("<computed>"),
         ast::PropName::BigInt(i) => NameComponent::interp(format!("<{}n>", i.value)),
     }
 }
