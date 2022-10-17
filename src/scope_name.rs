@@ -1,10 +1,11 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::Range;
 
-use rslint_parser::SyntaxToken;
+use swc_ecma_visit::swc_ecma_ast as ast;
 
-use crate::rslint::convert_text_range;
+use crate::swc::convert_span;
 
 /// An abstract scope name which can consist of multiple [`NameComponent`]s.
 #[derive(Debug)]
@@ -45,8 +46,7 @@ impl NameComponent {
     pub fn text(&self) -> &str {
         match &self.inner {
             NameComponentInner::Interpolation(s) => s,
-            NameComponentInner::SourceIdentifierToken(t) => t.text().as_str(),
-            NameComponentInner::SourcePunctuationToken(_) => "",
+            NameComponentInner::SourceIdentifierToken(t) => &t.sym,
         }
     }
 
@@ -56,34 +56,25 @@ impl NameComponent {
     /// to a specific token inside the source text.
     pub fn range(&self) -> Option<Range<u32>> {
         match &self.inner {
-            NameComponentInner::SourceIdentifierToken(t)
-            | NameComponentInner::SourcePunctuationToken(t) => {
-                Some(convert_text_range(t.text_range()))
-            }
+            NameComponentInner::SourceIdentifierToken(t) => Some(convert_span(t.span)),
             _ => None,
         }
     }
 
-    pub(crate) fn interp(s: &'static str) -> Self {
+    pub(crate) fn interp(s: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            inner: NameComponentInner::Interpolation(s),
+            inner: NameComponentInner::Interpolation(s.into()),
         }
     }
-    pub(crate) fn ident(token: SyntaxToken) -> Self {
+    pub(crate) fn ident(ident: ast::Ident) -> Self {
         Self {
-            inner: NameComponentInner::SourceIdentifierToken(token),
-        }
-    }
-    pub(crate) fn punct(token: SyntaxToken) -> Self {
-        Self {
-            inner: NameComponentInner::SourcePunctuationToken(token),
+            inner: NameComponentInner::SourceIdentifierToken(ident),
         }
     }
 }
 
 #[derive(Debug)]
 pub(crate) enum NameComponentInner {
-    Interpolation(&'static str),
-    SourceIdentifierToken(SyntaxToken),
-    SourcePunctuationToken(SyntaxToken),
+    Interpolation(Cow<'static, str>),
+    SourceIdentifierToken(ast::Ident),
 }

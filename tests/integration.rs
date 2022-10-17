@@ -1,13 +1,52 @@
+use std::ops::Range;
+
 use js_source_scopes::{
-    extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, SourceContext, SourcePosition,
+    extract_scope_names, NameResolver, ScopeIndex, ScopeLookupResult, ScopeName, SourceContext,
+    SourcePosition,
 };
+
+fn resolve_original_scopes(
+    minified: &str,
+    map: &str,
+    scopes: Vec<(Range<u32>, Option<ScopeName>)>,
+) -> Vec<(Range<u32>, Option<String>, Option<String>)> {
+    let ctx = SourceContext::new(&minified).unwrap();
+
+    let sm = sourcemap::decode_slice(map.as_bytes()).unwrap();
+
+    let resolver = NameResolver::new(&ctx, &sm);
+
+    let resolved_scopes = scopes.into_iter().map(|(range, name)| {
+        let minified_name = name.as_ref().map(|n| n.to_string());
+        let original_name = name.map(|n| resolver.resolve_name(&n));
+
+        (range, minified_name, original_name)
+    });
+    resolved_scopes.collect()
+}
+
+#[test]
+fn resolves_scopes_simple() {
+    let minified = std::fs::read_to_string("tests/fixtures/simple/minified.js").unwrap();
+    let map = std::fs::read_to_string("tests/fixtures/simple/minified.js.map").unwrap();
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    assert_eq!(
+        resolved_scopes,
+        [(0..14, Some("t".into()), Some("abcd".into()))]
+    );
+}
 
 #[test]
 fn resolves_scope_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
-    let scopes = extract_scope_names(&src);
+    let scopes = extract_scope_names(&src).unwrap();
     // dbg!(&scopes);
+
     let scopes: Vec<_> = scopes
         .into_iter()
         .map(|s| (s.0, s.1.map(|n| n.to_string()).filter(|s| !s.is_empty())))
@@ -132,22 +171,27 @@ fn resolves_scope_names() {
 #[test]
 fn resolves_token_from_names() {
     let minified = std::fs::read_to_string("tests/fixtures/preact.module.js").unwrap();
-    let ctx = SourceContext::new(&minified).unwrap();
-
     let map = std::fs::read_to_string("tests/fixtures/preact.module.js.map").unwrap();
-    let sm = sourcemap::decode_slice(map.as_bytes()).unwrap();
 
-    let scopes = extract_scope_names(&minified);
-    // dbg!(&scopes);
+    let scopes = extract_scope_names(&minified).unwrap();
 
-    let resolver = NameResolver::new(&ctx, &sm);
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 
-    let resolved_scopes = scopes.into_iter().map(|(range, name)| {
-        let minified_name = name.as_ref().map(|n| n.to_string());
-        let original_name = name.map(|n| resolver.resolve_name(&n));
+    for (range, minified, original) in resolved_scopes {
+        println!("{range:?}");
+        println!("  minified: {minified:?}");
+        println!("  original: {original:?}");
+    }
+}
 
-        (range, minified_name, original_name)
-    });
+#[test]
+fn parses_large_vendors() {
+    let minified = std::fs::read_to_string("tests/fixtures/vendors/vendors.js").unwrap();
+    let map = std::fs::read_to_string("tests/fixtures/vendors/vendors.js.map").unwrap();
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 
     for (range, minified, original) in resolved_scopes {
         println!("{range:?}");
