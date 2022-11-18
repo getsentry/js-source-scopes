@@ -1,0 +1,1 @@
+{"version":3,"names":["Foo","bar"],"sources":["tests/fixtures/prototype-chain/original.js"],"sourcesContent":["function Foo() {}\nFoo.prototype.bar = () => {};\nexport default (new Foo).bar();"],"mappings":"AAAA,SAASA,KACTA,YAAcC,IAAM,sBACL,IAAKD,GAAKC"}
