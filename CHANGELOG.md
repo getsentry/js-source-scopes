@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Various fixes & improvements
+
+- fix: Ensure exact token match in NameResolver (#14) by @Swatinem
+
 ## 0.2.0
 
 ### Features
