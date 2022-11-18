@@ -5,6 +5,10 @@ use js_source_scopes::{
     SourcePosition,
 };
 
+fn fixture(name: &str) -> String {
+    std::fs::read_to_string(format!("tests/fixtures/{name}")).unwrap()
+}
+
 fn resolve_original_scopes(
     minified: &str,
     map: &str,
@@ -198,4 +202,19 @@ fn parses_large_vendors() {
         println!("  minified: {minified:?}");
         println!("  original: {original:?}");
     }
+}
+
+#[test]
+fn should_only_resolve_exact() {
+    let minified = fixture("prototype-chain/minified.js");
+    let map = fixture("prototype-chain/minified.js.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    // The sourcemap was manually edited to remove the `prototype` token/name.
+    // When resolving names, we should make sure we have exact matches, otherwise
+    // we would use the preceding token and end up with `Foo.Foo.bar`.
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    assert_eq!(resolved_scopes[1].2, Some("Foo.prototype.bar".into()));
 }

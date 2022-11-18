@@ -1,3 +1,11 @@
+# Minifying code and creating SourceMaps:
+
+For example:
+
+```
+./node_modules/.bin/terser -c -m --module tests/fixtures/simple/original.js --source-map includeSources -o tests/fixtures/simple/minified.js
+```
+
 # trace
 
 A sync and async stack trace through various constructs, with named and anonymous

@@ -1,0 +1,1 @@
+function t(){}t.prototype.bar=()=>{};export default(new t).bar();
