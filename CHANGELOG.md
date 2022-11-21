@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+### Various fixes & improvements
+
+- fix: Allow an off-by-one in Token matching (#15) by @Swatinem
+
 ## 0.2.1
 
 ### Various fixes & improvements
