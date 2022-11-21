@@ -205,7 +205,7 @@ fn parses_large_vendors() {
 }
 
 #[test]
-fn should_only_resolve_exact() {
+fn should_not_resolve_mismatch() {
     let minified = fixture("prototype-chain/minified.js");
     let map = fixture("prototype-chain/minified.js.map");
 
@@ -217,4 +217,18 @@ fn should_only_resolve_exact() {
     let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
 
     assert_eq!(resolved_scopes[1].2, Some("Foo.prototype.bar".into()));
+}
+
+#[test]
+fn should_resolve_exactish() {
+    let minified = fixture("off-by-one/test.min.js");
+    let map = fixture("off-by-one/test.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    assert_eq!(resolved_scopes[2].2, Some("onFailure".into()));
+    assert_eq!(resolved_scopes[3].2, Some("invoke".into()));
+    assert_eq!(resolved_scopes[4].2, Some("test".into()));
 }

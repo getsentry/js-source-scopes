@@ -32,9 +32,11 @@ impl<'a, T: AsRef<str>> NameResolver<'a, T> {
         let token = self
             .sourcemap
             .lookup_token(source_position.line, source_position.column)?;
-        let is_exact_match = token.get_dst() == (source_position.line, source_position.column);
 
-        if is_exact_match {
+        let is_exactish_match = token.get_dst_line() == source_position.line
+            && token.get_dst_col() >= source_position.column - 1;
+
+        if is_exactish_match {
             token.get_name()
         } else {
             None
