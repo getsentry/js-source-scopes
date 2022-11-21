@@ -218,3 +218,18 @@ fn should_only_resolve_exact() {
 
     assert_eq!(resolved_scopes[1].2, Some("Foo.prototype.bar".into()));
 }
+
+#[test]
+fn off_by_one_case() {
+    let minified = fixture("off-by-one/test.min.js");
+    let map = fixture("off-by-one/test.min.js.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    for (range, minified, original) in &resolved_scopes {
+        println!("{range:?}");
+        println!("  minified: {minified:?}");
+        println!("  original: {original:?}");
+    }
+}
