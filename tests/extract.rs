@@ -228,3 +228,29 @@ fn extract_empty_function() {
     let expected = [None, None];
     assert_eq!(scopes, expected);
 }
+
+#[test]
+fn extract_nested_iife_objects() {
+    // NOTE: This mimicks what react-dom does to transpile JSX children into render tree.
+    let src = r#"
+        (function () {})({
+          children: (function () {})({
+            children: (function () {})({
+              onSubmitError () {
+                throw new Error('wat')
+              }
+            })
+          })
+        })
+        "#;
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        None,
+        Some("<object>.children".into()),
+        Some("<object>.children.children".into()),
+        Some("<object>.children.children.onSubmitError".into()),
+    ];
+    assert_eq!(scopes, expected);
+}

@@ -213,6 +213,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
             // An object literal member:
             // `{ $name() ... }`
             Parent::MethodProp(method, _) => {
+                push_sep(&mut scope_name);
                 scope_name
                     .components
                     .push_front(prop_name_to_component(&method.key));
@@ -222,6 +223,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
             // `{ $name: ... }`
             Parent::KeyValueProp(kv, _) => {
                 if let Some(ident) = kv.key.as_ident() {
+                    push_sep(&mut scope_name);
                     scope_name
                         .components
                         .push_front(NameComponent::ident(ident.clone()));
