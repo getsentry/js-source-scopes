@@ -69,6 +69,10 @@ fn resolves_scope_names() {
         index.lookup(offset)
     };
 
+    assert_eq!(lookup(99, 3), NamedScope("Klass.prototype[method]"));
+    assert_eq!(lookup(93, 3), NamedScope("Klass.prototype.method"));
+    assert_eq!(lookup(89, 3), NamedScope("Klass.prototype[42]"));
+
     // objectLiteralAnon@http://127.0.0.1:8080/sync.mjs:84:11
     // at Object.objectLiteralAnon (http://127.0.0.1:8080/sync.mjs:84:11)
     assert_eq!(lookup(84, 11), NamedScope("obj.objectLiteralAnon"));

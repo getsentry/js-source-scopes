@@ -340,6 +340,7 @@ fn prefix_getters_setters(kind: ast::MethodKind, scope_name: &mut ScopeName) {
 /// This is only possible if the expression is an identifier or a member expression.
 fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
     let mut scope_name = ScopeName::new();
+
     loop {
         match expr {
             ast::Expr::Ident(ident) => {
@@ -356,6 +357,18 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
                         .push_front(NameComponent::ident(ident.clone()));
                     scope_name.components.push_front(NameComponent::interp("."));
                 }
+
+                if let Some(computed_prop) = member.prop.as_computed() {
+                    if let Some((computed_name, need_delimiter)) =
+                        computed_prop_name_to_component(computed_prop)
+                    {
+                        scope_name.components.push_front(computed_name);
+                        if need_delimiter {
+                            scope_name.components.push_front(NameComponent::interp("."));
+                        }
+                    }
+                }
+
                 expr = &member.obj;
             }
 
@@ -369,6 +382,24 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
             _ => return None,
         }
     }
+}
+
+fn computed_prop_name_to_component(prop: &ast::ComputedPropName) -> Option<(NameComponent, bool)> {
+    if let Some(lit) = prop.expr.as_lit() {
+        if let ast::Lit::Str(prop) = lit {
+            return Some((NameComponent::interp(prop.value.to_string()), true));
+        }
+
+        if let ast::Lit::Num(prop) = lit {
+            return Some((NameComponent::interp(format!("[{}]", prop.value)), false));
+        }
+    }
+
+    if let Some(ident) = prop.expr.as_ident() {
+        return Some((NameComponent::interp(format!("[{}]", ident.sym)), false));
+    }
+
+    None
 }
 
 fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
