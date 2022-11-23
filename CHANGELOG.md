@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+### Features
+
+- Handle computed properties in scope names. ([#18](https://github.com/getsentry/js-source-scopes/pull/18))
+
+### Fixes
+
+- Correctly handle scope names for nested object literals. ([#19](https://github.com/getsentry/js-source-scopes/pull/19))
+
 ## 0.2.2
 
 ### Various fixes & improvements
@@ -29,4 +39,3 @@
 ## 0.1.0
 
 Inception
-
