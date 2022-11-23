@@ -340,6 +340,7 @@ fn prefix_getters_setters(kind: ast::MethodKind, scope_name: &mut ScopeName) {
 /// This is only possible if the expression is an identifier or a member expression.
 fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
     let mut scope_name = ScopeName::new();
+
     loop {
         match expr {
             ast::Expr::Ident(ident) => {
@@ -356,6 +357,11 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
                         .push_front(NameComponent::ident(ident.clone()));
                     scope_name.components.push_front(NameComponent::interp("."));
                 }
+
+                if let Some(computed_prop) = member.prop.as_computed() {
+                    push_computed_prop_name(computed_prop, &mut scope_name)
+                }
+
                 expr = &member.obj;
             }
 
@@ -368,6 +374,35 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
 
             _ => return None,
         }
+    }
+}
+
+fn push_computed_prop_name(prop_name: &ast::ComputedPropName, scope_name: &mut ScopeName) {
+    if let Some(literal) = prop_name.expr.as_lit() {
+        let component = NameComponent::interp(format!("[{}]", lit_as_string(literal)));
+        scope_name.components.push_front(component);
+    } else if let Some(ident) = prop_name.expr.as_ident() {
+        scope_name.components.push_front(NameComponent::interp("]"));
+        scope_name
+            .components
+            .push_front(NameComponent::ident(ident.clone()));
+        scope_name.components.push_front(NameComponent::interp("["));
+    } else {
+        scope_name
+            .components
+            .push_front(NameComponent::interp("[<computed>]"));
+    }
+}
+
+fn lit_as_string(lit: &ast::Lit) -> String {
+    match lit {
+        ast::Lit::Str(v) => format!("\"{}\"", v.value),
+        ast::Lit::Num(v) => v.value.to_string(),
+        ast::Lit::BigInt(v) => format!("{}n", v.value),
+        ast::Lit::Bool(v) => v.value.to_string(),
+        ast::Lit::Regex(v) => format!("/{}/{}", v.exp, v.flags),
+        ast::Lit::Null(_) => String::from("null"),
+        ast::Lit::JSXText(v) => v.value.to_string(),
     }
 }
 

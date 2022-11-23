@@ -218,7 +218,7 @@ fn extract_anon_obj_literal() {
 #[test]
 fn extract_empty_function() {
     let src = r#"
-         (function () {
+        (function () {
           return () => {};
         })()
         "#;
@@ -251,6 +251,26 @@ fn extract_nested_iife_objects() {
         Some("<object>.children".into()),
         Some("<object>.children.children".into()),
         Some("<object>.children.children.onSubmitError".into()),
+    ];
+    assert_eq!(scopes, expected);
+}
+
+#[test]
+fn extract_computed_properties() {
+    let src = r#"         
+        Klass.prototype[42] = () => {}
+        Klass.prototype["method"] = () => {}
+        Klass.prototype[method] = () => {}
+        Klass.prototype[1 + 1] = () => {};
+        "#;
+    let scopes = extract_scope_names(src).unwrap();
+    let scopes = scope_strs(scopes);
+
+    let expected = [
+        Some("Klass.prototype[42]".into()),
+        Some("Klass.prototype[\"method\"]".into()),
+        Some("Klass.prototype[method]".into()),
+        Some("Klass.prototype[<computed>]".into()),
     ];
     assert_eq!(scopes, expected);
 }
