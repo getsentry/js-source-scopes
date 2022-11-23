@@ -236,9 +236,11 @@ fn extract_nested_iife_objects() {
         (function () {})({
           children: (function () {})({
             children: (function () {})({
-              onSubmitError () {
-                throw new Error('wat')
-              }
+              children: (function () {})({
+                onSubmitError () {
+                    throw new Error('wat')
+                }
+              })
             })
           })
         })
@@ -249,8 +251,9 @@ fn extract_nested_iife_objects() {
     let expected = [
         None,
         Some("<object>.children".into()),
-        Some("<object>.children.children".into()),
-        Some("<object>.children.children.onSubmitError".into()),
+        Some("<object>.{children}".into()),
+        Some("<object>.{children}".into()),
+        Some("<object>.{children}.onSubmitError".into()),
     ];
     assert_eq!(scopes, expected);
 }

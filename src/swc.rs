@@ -223,6 +223,22 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
             // `{ $name: ... }`
             Parent::KeyValueProp(kv, _) => {
                 if let Some(ident) = kv.key.as_ident() {
+                    // Translate `children.children.children` into `{children}`
+                    // NOTE: We could make it `{children#3}`, but we'd need to count the occurrences.
+                    if let Some(component) = scope_name.components.front() {
+                        if component.text() == ident.sym.to_string() {
+                            scope_name.components.pop_front();
+                            scope_name
+                                .components
+                                .push_front(NameComponent::interp(format!("{{{}}}", ident.sym)));
+                            continue;
+                        }
+
+                        if component.text() == format!("{{{}}}", ident.sym) {
+                            continue;
+                        }
+                    }
+
                     push_sep(&mut scope_name);
                     scope_name
                         .components
