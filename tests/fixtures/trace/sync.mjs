@@ -84,17 +84,3 @@ let obj = {
     throw new Error();
   },
 };
-
-Klass.prototype[42] = function () {
-  beepBoop();
-};
-
-Klass.prototype["method"] = function () {
-  beepBoop();
-};
-
-const method = "computedMethod";
-
-Klass.prototype[method] = function () {
-  beepBoop();
-};

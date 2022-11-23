@@ -359,14 +359,7 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
                 }
 
                 if let Some(computed_prop) = member.prop.as_computed() {
-                    if let Some((computed_name, need_delimiter)) =
-                        computed_prop_name_to_component(computed_prop)
-                    {
-                        scope_name.components.push_front(computed_name);
-                        if need_delimiter {
-                            scope_name.components.push_front(NameComponent::interp("."));
-                        }
-                    }
+                    push_computed_prop_name(computed_prop, &mut scope_name)
                 }
 
                 expr = &member.obj;
@@ -384,22 +377,33 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
     }
 }
 
-fn computed_prop_name_to_component(prop: &ast::ComputedPropName) -> Option<(NameComponent, bool)> {
-    if let Some(lit) = prop.expr.as_lit() {
-        if let ast::Lit::Str(prop) = lit {
-            return Some((NameComponent::interp(prop.value.to_string()), true));
-        }
-
-        if let ast::Lit::Num(prop) = lit {
-            return Some((NameComponent::interp(format!("[{}]", prop.value)), false));
-        }
+fn push_computed_prop_name(prop_name: &ast::ComputedPropName, scope_name: &mut ScopeName) {
+    if let Some(literal) = prop_name.expr.as_lit() {
+        let component = NameComponent::interp(format!("[{}]", lit_as_string(literal)));
+        scope_name.components.push_front(component);
+    } else if let Some(ident) = prop_name.expr.as_ident() {
+        scope_name.components.push_front(NameComponent::interp("]"));
+        scope_name
+            .components
+            .push_front(NameComponent::ident(ident.clone()));
+        scope_name.components.push_front(NameComponent::interp("["));
+    } else {
+        scope_name
+            .components
+            .push_front(NameComponent::interp("[<computed>]"));
     }
+}
 
-    if let Some(ident) = prop.expr.as_ident() {
-        return Some((NameComponent::interp(format!("[{}]", ident.sym)), false));
+fn lit_as_string(lit: &ast::Lit) -> String {
+    match lit {
+        ast::Lit::Str(v) => format!("\"{}\"", v.value),
+        ast::Lit::Num(v) => v.value.to_string(),
+        ast::Lit::BigInt(v) => format!("{}n", v.value),
+        ast::Lit::Bool(v) => v.value.to_string(),
+        ast::Lit::Regex(v) => format!("/{}/{}", v.exp, v.flags),
+        ast::Lit::Null(_) => String::from("null"),
+        ast::Lit::JSXText(v) => v.value.to_string(),
     }
-
-    None
 }
 
 fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
