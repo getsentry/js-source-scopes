@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Various fixes & improvements
+
+- fix: Use saturating_sub in try_map_token to prevent overflow (#21) by @kamilogorek
+
 ## 0.3.0
 
 ### Features
