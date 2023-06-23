@@ -12,10 +12,10 @@ homepage = "https://github.com/getsentry/js-source-scopes"
 repository = "https://github.com/getsentry/js-source-scopes"
 
 [dependencies]
-swc_common = "0.29.5"
-swc_ecma_parser = "0.122.6"
-swc_ecma_visit = { version = "0.80.5", features = ["path"] }
 indexmap = "1.7.0"
 sourcemap = "6.0.2"
+swc_common = "0.31.16"
+swc_ecma_parser = "0.136.7"
+swc_ecma_visit = { version = "0.92.5", features = ["path"] }
 thiserror = "1.0.32"
 tracing = "0.1.36"
