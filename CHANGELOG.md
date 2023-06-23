@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+### Various fixes & improvements
+
+- Update all `swc` crates to their latest version (#22) by @Swatinem
+
 ## 0.3.1
 
 ### Various fixes & improvements
