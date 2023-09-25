@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+### Various fixes & improvements
+
+- update dependencies with incompatible versions (#23) by @demoray
+
 ## 0.3.2
 
 ### Various fixes & improvements
