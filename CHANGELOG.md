@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+### Various fixes & improvements
+
+- Update dependencies (#25) by @Swatinem
+
 ## 0.4.0
 
 ### Various fixes & improvements
