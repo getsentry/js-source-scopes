@@ -267,9 +267,28 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
             // An assignment expression with a usable name on the left hand side
             // `$name = ...`
             Parent::AssignExpr(expr, _) => match &expr.left {
-                ast::PatOrExpr::Expr(expr) => {
-                    if let Some(mut expr_name) = infer_name_from_expr(expr) {
-                        push_sep(&mut scope_name);
+                ast::AssignTarget::Simple(ast::SimpleAssignTarget::Ident(ident)) => {
+                    push_sep(&mut scope_name);
+                    scope_name
+                        .components
+                        .push_front(NameComponent::ident(ident.id.clone()));
+
+                    prefix_getters_setters(kind, &mut scope_name);
+
+                    return scope_name;
+                }
+                ast::AssignTarget::Simple(ast::SimpleAssignTarget::Member(member)) => {
+                    if let Some(mut expr_name) = infer_name_from_expr(&member.obj) {
+                        if let Some(ident) = member.prop.as_ident() {
+                            scope_name
+                                .components
+                                .push_front(NameComponent::ident(ident.clone()));
+                            push_sep(&mut scope_name);
+                        }
+
+                        if let Some(computed_prop) = member.prop.as_computed() {
+                            push_computed_prop_name(computed_prop, &mut scope_name)
+                        }
 
                         expr_name.components.append(&mut scope_name.components);
                         scope_name.components = expr_name.components;
@@ -279,31 +298,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
                         return scope_name;
                     }
                 }
-                ast::PatOrExpr::Pat(pat) => match pat.as_ref() {
-                    ast::Pat::Ident(ident) => {
-                        push_sep(&mut scope_name);
-                        scope_name
-                            .components
-                            .push_front(NameComponent::ident(ident.id.clone()));
-
-                        prefix_getters_setters(kind, &mut scope_name);
-
-                        return scope_name;
-                    }
-                    ast::Pat::Expr(expr) => {
-                        if let Some(mut expr_name) = infer_name_from_expr(expr) {
-                            push_sep(&mut scope_name);
-
-                            expr_name.components.append(&mut scope_name.components);
-                            scope_name.components = expr_name.components;
-
-                            prefix_getters_setters(kind, &mut scope_name);
-
-                            return scope_name;
-                        }
-                    }
-                    _ => {}
-                },
+                _ => {}
             },
 
             Parent::ObjectLit(_, _) => {
