@@ -14,8 +14,8 @@ repository = "https://github.com/getsentry/js-source-scopes"
 [dependencies]
 indexmap = "2.8.0"
 sourcemap = "9.1.2"
-swc_common = "0.33.26"
-swc_ecma_parser = "0.144.1"
-swc_ecma_visit = { version = "0.99.1", features = ["path"] }
+swc_common = "8.0.0"
+swc_ecma_parser = "10.0.1"
+swc_ecma_visit = { version = "8.0.0", features = ["path"] }
 thiserror = "2.0.12"
 tracing = "0.1.36"
