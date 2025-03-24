@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+### Various fixes & improvements
+
+- deps: Update (#28) by @loewenheim
+- feat(release): Replace release bot with GH app (#26) by @Jeffreyhung
+
 ## 0.5.0
 
 ### Various fixes & improvements
