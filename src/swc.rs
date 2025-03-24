@@ -2,8 +2,7 @@ use std::ops::Range;
 
 use swc_common::{BytePos, Span};
 use swc_ecma_parser::{Parser, StringInput};
-use swc_ecma_visit::swc_ecma_ast as ast;
-use swc_ecma_visit::{AstNodePath, VisitAstPath, VisitWithPath};
+use swc_ecma_visit::{swc_ecma_ast as ast, AstNodePath, VisitAstPath, VisitWithAstPath};
 
 use crate::scope_name::{NameComponent, ScopeName};
 use crate::Scopes;
@@ -24,7 +23,7 @@ pub fn parse_with_swc(src: &str) -> Result<Scopes, ParseError> {
     tracing::trace_span!("extracting scopes").in_scope(|| {
         let mut collector = ScopeCollector::new();
 
-        syntax.visit_children_with_path(&mut collector, &mut Default::default());
+        syntax.visit_children_with_ast_path(&mut collector, &mut Default::default());
 
         Ok(collector.into_scopes())
     })
@@ -74,7 +73,7 @@ impl VisitAstPath for ScopeCollector {
 
         self.scopes.push((convert_span(node.span), Some(name)));
 
-        node.visit_children_with_path(self, path);
+        node.visit_children_with_ast_path(self, path);
     }
 
     fn visit_function<'ast: 'r, 'r>(
@@ -91,7 +90,7 @@ impl VisitAstPath for ScopeCollector {
 
         self.scopes.push((convert_span(node.span), Some(name)));
 
-        node.visit_children_with_path(self, path);
+        node.visit_children_with_ast_path(self, path);
     }
 
     // NOTE: instead of using `visit_constructor` here to find just a class constructor,
@@ -110,7 +109,7 @@ impl VisitAstPath for ScopeCollector {
 
         self.scopes.push((convert_span(node.span), Some(name)));
 
-        node.visit_children_with_path(self, path);
+        node.visit_children_with_ast_path(self, path);
     }
 
     fn visit_getter_prop<'ast: 'r, 'r>(
@@ -129,7 +128,7 @@ impl VisitAstPath for ScopeCollector {
 
         self.scopes.push((convert_span(node.span), Some(name)));
 
-        node.visit_children_with_path(self, path);
+        node.visit_children_with_ast_path(self, path);
     }
 
     fn visit_setter_prop<'ast: 'r, 'r>(
@@ -148,7 +147,7 @@ impl VisitAstPath for ScopeCollector {
 
         self.scopes.push((convert_span(node.span), Some(name)));
 
-        node.visit_children_with_path(self, path);
+        node.visit_children_with_ast_path(self, path);
     }
 }
 
@@ -226,7 +225,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
                     push_sep(&mut scope_name);
                     scope_name
                         .components
-                        .push_front(NameComponent::ident(ident.clone()));
+                        .push_front(NameComponent::ident(ident.clone().into()));
                 }
             }
 
@@ -245,7 +244,10 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
             Parent::PrivateMethod(method, _) => {
                 scope_name
                     .components
-                    .push_front(NameComponent::ident(method.key.id.clone()));
+                    .push_front(NameComponent::ident(ast::Ident::new_no_ctxt(
+                        method.key.name.clone(),
+                        method.key.span,
+                    )));
                 scope_name.components.push_front(NameComponent::interp("#"));
             }
 
@@ -282,7 +284,7 @@ fn infer_name_from_ctx(path: &AstNodePath) -> ScopeName {
                         if let Some(ident) = member.prop.as_ident() {
                             scope_name
                                 .components
-                                .push_front(NameComponent::ident(ident.clone()));
+                                .push_front(NameComponent::ident(ident.clone().into()));
                             push_sep(&mut scope_name);
                         }
 
@@ -349,7 +351,7 @@ fn infer_name_from_expr(mut expr: &ast::Expr) -> Option<ScopeName> {
                 if let Some(ident) = member.prop.as_ident() {
                     scope_name
                         .components
-                        .push_front(NameComponent::ident(ident.clone()));
+                        .push_front(NameComponent::ident(ident.clone().into()));
                     scope_name.components.push_front(NameComponent::interp("."));
                 }
 
@@ -403,7 +405,7 @@ fn lit_as_string(lit: &ast::Lit) -> String {
 
 fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
     match prop {
-        ast::PropName::Ident(ref i) => NameComponent::ident(i.clone()),
+        ast::PropName::Ident(ref i) => NameComponent::ident(i.clone().into()),
         ast::PropName::Str(s) => NameComponent::interp(format!("<\"{}\">", s.value)),
         ast::PropName::Num(n) => NameComponent::interp(format!("<{}>", n)),
         ast::PropName::Computed(_) => NameComponent::interp("<computed>"),
