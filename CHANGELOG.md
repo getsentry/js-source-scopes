@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Update SWC dependencies by @nsavoire in [#30](https://github.com/getsentry/js-source-scopes/pull/30)
+
 ## 0.6.0
 
 ### Various fixes & improvements
