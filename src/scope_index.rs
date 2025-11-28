@@ -84,7 +84,7 @@ impl ScopeIndex {
     }
 
     /// Looks up the scope corresponding to the given `offset`.
-    pub fn lookup(&self, offset: u32) -> ScopeLookupResult {
+    pub fn lookup(&self, offset: u32) -> ScopeLookupResult<'_> {
         let range_idx = match self.ranges.binary_search_by_key(&offset, |r| r.0) {
             Ok(idx) => idx,
             Err(0) => 0, // this is pretty much unreachable since the first offset is 0
@@ -99,7 +99,7 @@ impl ScopeIndex {
         self.resolve_name(name_idx)
     }
 
-    fn resolve_name(&self, name_idx: u32) -> ScopeLookupResult {
+    fn resolve_name(&self, name_idx: u32) -> ScopeLookupResult<'_> {
         if name_idx == GLOBAL_SCOPE_SENTINEL {
             ScopeLookupResult::Unknown
         } else if name_idx == ANONYMOUS_SCOPE_SENTINEL {
@@ -116,7 +116,7 @@ impl ScopeIndex {
     /// offsets.
     ///
     /// Scopes are returned in order of their starting offsets.
-    pub fn iter(&self) -> impl Iterator<Item = (u32, ScopeLookupResult)> {
+    pub fn iter(&self) -> impl Iterator<Item = (u32, ScopeLookupResult<'_>)> {
         self.ranges.iter().map(|r| (r.0, self.resolve_name(r.1)))
     }
 }

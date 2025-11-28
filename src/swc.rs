@@ -393,7 +393,7 @@ fn push_computed_prop_name(prop_name: &ast::ComputedPropName, scope_name: &mut S
 
 fn lit_as_string(lit: &ast::Lit) -> String {
     match lit {
-        ast::Lit::Str(v) => format!("\"{}\"", v.value),
+        ast::Lit::Str(v) => format!("{:?}", v.value),
         ast::Lit::Num(v) => v.value.to_string(),
         ast::Lit::BigInt(v) => format!("{}n", v.value),
         ast::Lit::Bool(v) => v.value.to_string(),
@@ -406,7 +406,7 @@ fn lit_as_string(lit: &ast::Lit) -> String {
 fn prop_name_to_component(prop: &ast::PropName) -> NameComponent {
     match prop {
         ast::PropName::Ident(ref i) => NameComponent::ident(i.clone().into()),
-        ast::PropName::Str(s) => NameComponent::interp(format!("<\"{}\">", s.value)),
+        ast::PropName::Str(s) => NameComponent::interp(format!("<{:?}>", s.value)),
         ast::PropName::Num(n) => NameComponent::interp(format!("<{}>", n)),
         ast::PropName::Computed(_) => NameComponent::interp("<computed>"),
         ast::PropName::BigInt(i) => NameComponent::interp(format!("<{}n>", i.value)),
