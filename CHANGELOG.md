@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1
+
+### Internal Changes 🔧
+
+- (release) Switch from action-prepare-release to Craft by @BYK in [#31](https://github.com/getsentry/js-source-scopes/pull/31)
+- Update sourcemap by @loewenheim in [#32](https://github.com/getsentry/js-source-scopes/pull/32)
+
 ## 0.7.0
 
 - Update SWC dependencies by @nsavoire in [#30](https://github.com/getsentry/js-source-scopes/pull/30)
