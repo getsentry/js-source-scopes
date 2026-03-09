@@ -1,0 +1,1 @@
+export class ApiConnector{async#e(e){return await fetch(e)}#t(e){return"https://api.example.com/"+e}async get(e){return this.#e({url:this.#t(e),method:"GET"})}}

@@ -45,6 +45,26 @@ fn resolves_scopes_simple() {
 }
 
 #[test]
+fn resolves_private_method() {
+    let minified = fixture("private-method/minified.js");
+    let map = fixture("private-method/minified.js.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    assert_eq!(
+        resolved_scopes,
+        [
+            (7..160, Some("new ApiConnector".into()), Some("new ApiConnector".into())),
+            (26..59, Some("ApiConnector.#e".into()), Some("ApiConnector.#makeRequest".into())),
+            (59..100, Some("ApiConnector.#t".into()), Some("ApiConnector.#buildUrl".into())),
+            (100..159, Some("ApiConnector.get".into()), Some("ApiConnector.get".into())),
+        ]
+    );
+}
+
+#[test]
 fn resolves_scope_names() {
     let src = std::fs::read_to_string("tests/fixtures/trace/sync.mjs").unwrap();
 
