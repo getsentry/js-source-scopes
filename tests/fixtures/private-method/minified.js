@@ -1,1 +1,1 @@
-export class ApiConnector{async#e(e){return await fetch(e)}#t(e){return"https://api.example.com/"+e}async get(e){return this.#e({url:this.#t(e),method:"GET"})}}
+export class ApiConnector{#e="https://api.example.com/";async#t(e){let t=await fetch(e);if(!t.ok)throw new Error("Failed to fetch!");return t}#r(e){return this.#e+e}async get(e){return this.#t({url:this.#r(e),method:"GET"})}}

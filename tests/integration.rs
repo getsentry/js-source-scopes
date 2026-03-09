@@ -56,10 +56,10 @@ fn resolves_private_method() {
     assert_eq!(
         resolved_scopes,
         [
-            (7..160, Some("new ApiConnector".into()), Some("new ApiConnector".into())),
-            (26..59, Some("ApiConnector.#e".into()), Some("ApiConnector.#makeRequest".into())),
-            (59..100, Some("ApiConnector.#t".into()), Some("ApiConnector.#buildUrl".into())),
-            (100..159, Some("ApiConnector.get".into()), Some("ApiConnector.get".into())),
+            (7..225, Some("new ApiConnector".into()), Some("new ApiConnector".into())),
+            (56..142, Some("ApiConnector.#t".into()), Some("ApiConnector.#makeRequest".into())),
+            (142..165, Some("ApiConnector.#r".into()), Some("ApiConnector.#buildUrl".into())),
+            (165..224, Some("ApiConnector.get".into()), Some("ApiConnector.get".into())),
         ]
     );
 }
