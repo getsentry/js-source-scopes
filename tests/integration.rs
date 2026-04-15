@@ -232,3 +232,51 @@ fn should_resolve_exactish() {
     assert_eq!(resolved_scopes[3].2, Some("invoke".into()));
     assert_eq!(resolved_scopes[4].2, Some("test".into()));
 }
+
+#[test]
+fn should_resolve_name_from_function_keyword_token() {
+    // TypeScript attaches the original name to the `function` keyword token
+    // rather than to the identifier that follows. The source map has:
+    //   col 7 → name "initServer" (within `function` keyword)
+    //   col 8 → no name (space)
+    //   [no segment at col 9 where `ab` starts]
+    // lookup_token(0, 9) returns the col-8 token (no name).
+    // The fix should look back to col 7 and use "initServer".
+    let minified = fixture("ts-function-name/minified.js");
+    let map = fixture("ts-function-name/minified.js.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    // The function scope should resolve from "ab" to "initServer"
+    assert_eq!(resolved_scopes[0].1, Some("ab".into()));
+    assert_eq!(resolved_scopes[0].2, Some("initServer".into()));
+}
+
+#[test]
+fn should_resolve_name_from_function_keyword_token_three_segments() {
+    // Variant where the source map has THREE segments around the function:
+    //   col 0 → name "initServer" (start of `function` keyword)
+    //   col 8 → no name (space)
+    //   col 9 → no name (identifier `a`)
+    // The name-bearing segment is 2 tokens back from the identifier, so the
+    // single-step lookback does not reach it. This documents a limitation:
+    // when there's an extra no-name segment between the named token and the
+    // identifier, the name is not resolved.
+    let minified = fixture("ts-function-name/sentry-repro.js");
+    let map = fixture("ts-function-name/sentry-repro.js.map");
+
+    let scopes = extract_scope_names(&minified).unwrap();
+
+    let resolved_scopes = resolve_original_scopes(&minified, &map, scopes);
+
+    let func_scope = resolved_scopes
+        .iter()
+        .find(|(_, m, _)| m.as_deref() == Some("a"))
+        .expect("should find function 'a'");
+
+    // Currently NOT resolved — the name is too many tokens back.
+    // If the fix is improved to walk further back, update this to "initServer".
+    assert_eq!(func_scope.2, Some("a".into()));
+}

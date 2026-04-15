@@ -37,9 +37,31 @@ impl<'a, T: AsRef<str>> NameResolver<'a, T> {
             && token.get_dst_col() >= source_position.column.saturating_sub(1);
 
         if is_exactish_match {
-            token.get_name()
-        } else {
-            None
+            if let Some(name) = token.get_name() {
+                return Some(name);
+            }
+
+            // If the token at the identifier position has no name, check the
+            // immediately preceding token. Some source map generators (e.g.
+            // TypeScript) attach the original function name to the `function`
+            // keyword token rather than the identifier that follows it.
+            // We only use the preceding token's name if it maps to the same
+            // original source position, indicating it's part of the same mapping.
+            if token.get_dst_col() > 0 {
+                if let Some(prev_token) = self
+                    .sourcemap
+                    .lookup_token(token.get_dst_line(), token.get_dst_col() - 1)
+                {
+                    if prev_token.get_src_id() == token.get_src_id()
+                        && prev_token.get_src_line() == token.get_src_line()
+                        && prev_token.get_src_col() == token.get_src_col()
+                    {
+                        return prev_token.get_name();
+                    }
+                }
+            }
         }
+
+        None
     }
 }

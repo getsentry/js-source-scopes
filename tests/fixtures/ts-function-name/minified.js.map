@@ -1,0 +1,1 @@
+{"version":3,"sources":["original.ts"],"names":["initServer","console"],"mappings":"AAAA,OAASA,CAAA,GAAY,EAAC,CAClBC,qBACJ","file":"minified.js","sourcesContent":["function initServer() {\n    console.log(\"hello\");\n}"]}
