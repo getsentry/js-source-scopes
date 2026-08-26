@@ -28,7 +28,21 @@ impl<'a, T: AsRef<str>> NameResolver<'a, T> {
 
     fn try_map_token(&self, c: &NameComponent) -> Option<&str> {
         let range = c.range()?;
-        let source_position = self.ctx.offset_to_position(range.start)?;
+
+        if let Some(name) = self.lookup_name_at(range.start) {
+            return Some(name);
+        }
+
+        // Some source maps (e.g., from terser/webpack) place the name mapping
+        // on the token immediately after the identifier rather than on it.
+        // This is common for private class methods (#foo), where the name ends
+        // up on the `(` token following the method name. Fall back to looking
+        // up at the end of the range to catch these cases.
+        self.lookup_name_at(range.end)
+    }
+
+    fn lookup_name_at(&self, offset: u32) -> Option<&str> {
+        let source_position = self.ctx.offset_to_position(offset)?;
         let token = self
             .sourcemap
             .lookup_token(source_position.line, source_position.column)?;
