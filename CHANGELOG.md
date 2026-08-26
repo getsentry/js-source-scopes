@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.2
+
+### Bug Fixes 🐛
+
+- Resolve function names from preceding source map token by @vincent861223 in [#35](https://github.com/getsentry/js-source-scopes/pull/35)
+
+### Internal Changes 🔧
+
+- Pin GitHub Actions to full-length commit SHAs by @joshuarli in [#34](https://github.com/getsentry/js-source-scopes/pull/34)
+
 ## 0.7.1
 
 ### Internal Changes 🔧

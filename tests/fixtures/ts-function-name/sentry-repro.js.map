@@ -1,0 +1,1 @@
+{"version":3,"sources":["original.js"],"names":["initServer"],"mappings":";;AAASA,QAAA,CAAA,CAAU,CAAC,CAAE,CAClB,OAAO,IAAI,CAAC,OAAO,CACvB,CACAA,CAAU,CAAC","file":"minified.js","sourcesContent":["function initServer() {\n    console.log(\"hello\");\n}\ninitServer();\n"],"debug_id":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
