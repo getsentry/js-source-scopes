@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.3
+
+### Internal Changes 🔧
+
+#### Ci
+
+- Remove `changelog-preview` by @tobias-wilfert in [#37](https://github.com/getsentry/js-source-scopes/pull/37)
+- Pin macOS runner to macos-15 by @loewenheim in [#36](https://github.com/getsentry/js-source-scopes/pull/36)
+
+#### Other
+
+- Update codeowners by @tobias-wilfert in [#38](https://github.com/getsentry/js-source-scopes/pull/38)
+
+### Other
+
+- Private method translations are not working by @pablomatiasgomez in [#33](https://github.com/getsentry/js-source-scopes/pull/33)
+
 ## 0.7.2
 
 ### Bug Fixes 🐛
