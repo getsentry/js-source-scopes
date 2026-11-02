@@ -383,7 +383,7 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
 name = "js-source-scopes"
-version = "0.7.1"
+version = "0.7.3"
 dependencies = [
  "indexmap",
  "sourcemap",
@@ -756,8 +756,7 @@ dependencies = [
 [[package]]
 name = "swc_ecma_parser"
 version = "27.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f1a51af1a92cd4904c073b293e491bbc0918400a45d58227b34c961dd6f52d7"
+source = "git+https://github.com/getsentry/swc_ecma_parser?rev=f4b5339a53bd1b0ec90e22195303df95462736f9#f4b5339a53bd1b0ec90e22195303df95462736f9"
 dependencies = [
  "bitflags",
  "either",
